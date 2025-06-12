@@ -72,20 +72,4 @@ class CouponTest {
         // then
         assertThat(discountedPrice).isEqualTo(expectedPrice);
     }
-
-    @Test
-    void 쿠폰_재고가_0이면_예외가_발생한다() {
-        // given
-        Coupon coupon = Coupon.builder()
-                .id(4L)
-                .discountValue(3000L)
-                .discountType(DiscountType.AMOUNT)
-                .title("3000원 할인 쿠폰")
-                .stock(0L)
-                .build();
-
-        // when & then
-        assertThatThrownBy(() -> coupon.apply(10000L))
-                .isInstanceOf(OutOfStockCouponException.class);
-    }
 }

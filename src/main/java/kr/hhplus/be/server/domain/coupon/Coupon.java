@@ -1,23 +1,34 @@
 package kr.hhplus.be.server.domain.coupon;
 
-import kr.hhplus.be.server.common.exception.InvalidCouponValueException;
+import jakarta.persistence.*;
 import kr.hhplus.be.server.common.exception.NotSupportedDiscountTypeException;
-import kr.hhplus.be.server.common.exception.OutOfStockCouponException;
+import lombok.AccessLevel;
 import lombok.Builder;
 import lombok.Getter;
+import lombok.NoArgsConstructor;
 
 import java.time.LocalDateTime;
 
+@Entity
 @Getter
+@NoArgsConstructor(access = AccessLevel.PROTECTED)
 public class Coupon {
 
+    @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    @Column(name = "coupon_id")
     private Long id;
     private Long discountValue;
+
+    @Enumerated(EnumType.STRING)
     private DiscountType discountType;
     private String title;
     private Long stock;
     private LocalDateTime startDate;
     private LocalDateTime endDate;
+
+    @Version
+    private Long version;
 
     @Builder
     public Coupon(Long id, Long discountValue, DiscountType discountType, String title, Long stock, LocalDateTime startDate, LocalDateTime endDate) {
@@ -31,10 +42,6 @@ public class Coupon {
     }
 
     public Long apply(Long productPrice) {
-        if (this.stock <= 0) {
-            throw new OutOfStockCouponException("쿠폰의 재고가 부족합니다.");
-        }
-
         if (discountType == DiscountType.AMOUNT) {
             return Math.max(productPrice - discountValue, 0L);
         } else if (discountType == DiscountType.PERCENT) {
@@ -42,5 +49,9 @@ public class Coupon {
         }
 
         throw new NotSupportedDiscountTypeException("지원하지 않는 할인 유형입니다.");
+    }
+
+    public void decreaseStock() {
+        this.stock--;
     }
 }

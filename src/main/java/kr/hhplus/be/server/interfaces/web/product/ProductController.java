@@ -1,6 +1,7 @@
 package kr.hhplus.be.server.interfaces.web.product;
 
 import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.constraints.Min;
 import kr.hhplus.be.server.common.response.ApiResponse;
 import kr.hhplus.be.server.interfaces.web.product.dto.response.ProductResponse;
@@ -14,6 +15,7 @@ import org.springframework.web.bind.annotation.RestController;
 
 import java.util.List;
 
+@Tag(name = "상품", description = "상품 관련 API")
 @RestController
 @RequiredArgsConstructor
 @RequestMapping("/api/v1/products")

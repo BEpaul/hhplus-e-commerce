@@ -6,11 +6,13 @@ import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Size;
 import kr.hhplus.be.server.domain.order.Order;
 import kr.hhplus.be.server.domain.order.OrderProduct;
+import lombok.Builder;
 import lombok.Getter;
 
 import java.util.List;
 
 @Getter
+@Builder
 public class OrderRequest {
     @NotNull(message = "사용자 ID는 필수입니다.")
     @Min(value = 1, message = "사용자 ID는 1 이상이어야 합니다.")

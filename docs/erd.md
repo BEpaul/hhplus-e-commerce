@@ -37,7 +37,7 @@
 - `CASH`: 현금 결제
 
 ### 💡 결제 상태
-- `SUCCESS`: 결제 성공
+- `APPROVED`: 결제 승인(성공)
 - `FAILED`: 결제 실패
 - `PENDING`: 결제 대기
 - `CANCELED`: 결제 취소
@@ -121,8 +121,9 @@ CREATE TABLE `order_product` (
 CREATE TABLE `payment` (
     `payment_id` BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
     `order_id` BIGINT UNSIGNED NOT NULL,
-    `payment_method` VARCHAR(30) NOT NULL,
+    `idempotency_key` VARCHAR(100) NOT NULL,
     `amount` BIGINT NOT NULL,
+    `payment_method` VARCHAR(30) NOT NULL,
     `status` VARCHAR(30) NOT NULL,
     `approved_at` DATETIME NULL,
     `canceled_at` DATETIME NULL,

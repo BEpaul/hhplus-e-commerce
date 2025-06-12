@@ -37,3 +37,7 @@ out/
 .vscode/
 
 data
+
+# custom
+application-test.yml
+application.yml

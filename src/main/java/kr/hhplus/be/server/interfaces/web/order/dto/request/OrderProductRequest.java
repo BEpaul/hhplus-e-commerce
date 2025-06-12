@@ -3,9 +3,11 @@ package kr.hhplus.be.server.interfaces.web.order.dto.request;
 import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotNull;
 import kr.hhplus.be.server.domain.order.OrderProduct;
+import lombok.Builder;
 import lombok.Getter;
 
 @Getter
+@Builder
 public class OrderProductRequest {
     @NotNull(message = "상품 ID는 필수입니다.")
     @Min(value = 1, message = "상품 ID는 1 이상이어야 합니다.")

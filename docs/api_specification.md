@@ -104,27 +104,76 @@ example:
 {
   "code": 200,
   "message": "상품 목록 조회 성공",
+  "data": [
+    {
+      "id": 1,
+      "name": "새우깡",
+      "price": 5000,
+      "stock": 10,
+      "description": "손이 가는 새우깡"
+    },
+    {
+      "id": 2,
+      "name": "메론킥",
+      "price": 7000,
+      "stock": 30,
+      "description": "맛도리"
+    },
+    {
+      "id": 3,
+      "name": "고무장갑",
+      "price": 50000,
+      "stock": 100,
+      "description": "최고급 고무장갑"
+    }
+  ]
+}
+```
+</details>
+
+### ✅ 상품 단건 조회
+사용자에게 상품의 상세 정보를 조회한다.
+- Method: `GET`
+- Endpoint: `/api/v1/products/{productId}`
+<details markdown="1">
+<summary>상세 보기</summary>
+
+### **Request**
+**Path parameters**
+
+| Field      | Type   | Description | Constraints |
+|------------|--------|-------------|-------------|
+| productId  | Number | 상품 ID      | 양의 정수   |
+
+### **Response**
+
+| Field   | Type   | Description       |
+|---------|--------|-------------------|
+| code    | Number | 응답 코드  |
+| message | String | 응답 메시지 |
+| data | Object | 상품 상세 정보 |
+| data.id | Number | 상품 ID |
+| data.name | String | 상품 이름 |
+| data.price | Number | 상품 가격 |
+| data.stock | Number | 상품 잔여 수량 |
+| data.description | String | 상품 상세 설명 |
+
+example:
+```json
+{
+  "code": 200,
+  "message": "상품 조회 성공",
   "data": {
-    "products": [
-      {
-        "id": 1,
-        "name": "상품 A",
-        "price": 10000,
-        "stock": 50,
-        "description": "상품 A의 상세 설명입니다."
-      },
-      {
-        "id": 2,
-        "name": "상품 B",
-        "price": 20000,
-        "stock": 30,
-        "description": "상품 B의 상세 설명입니다."
-      }
-    ]
+    "id": 1,
+    "name": "새우깡",
+    "price": 5000,
+    "stock": 10,
+    "description": "맛있는 새우깡"
   }
 }
 ```
 </details>
+
 
 ## 3️⃣ 주문 (Order)
 ### ✅ 주문

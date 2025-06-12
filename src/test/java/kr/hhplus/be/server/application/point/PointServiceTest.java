@@ -2,9 +2,11 @@ package kr.hhplus.be.server.application.point;
 
 import kr.hhplus.be.server.common.exception.ExceedsMaximumPointException;
 import kr.hhplus.be.server.common.exception.NegativeChargePointException;
+import kr.hhplus.be.server.common.exception.NegativeUsePointException;
+import kr.hhplus.be.server.common.exception.NotEnoughPointException;
 import kr.hhplus.be.server.common.exception.NotFoundUserException;
 import kr.hhplus.be.server.domain.point.Point;
-import kr.hhplus.be.server.infrastructure.point.PointRepository;
+import kr.hhplus.be.server.infrastructure.persistence.point.PointRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -101,6 +103,56 @@ class PointServiceTest {
 
         // when & then
         assertThatThrownBy(() -> pointService.getPoint(nonExistentUserId))
+                .isInstanceOf(NotFoundUserException.class);
+    }
+
+    @Test
+    void 포인트를_정상적으로_사용한다() {
+        // given
+        Long useAmount = 300000L;
+        given(pointRepository.findByUserId(userId)).willReturn(Optional.of(point));
+        given(pointRepository.save(any(Point.class))).willReturn(point);
+
+        // when
+        Point result = pointService.usePoint(userId, useAmount);
+
+        // then
+        assertThat(result.getVolume()).isEqualTo(700000L);
+        then(pointRepository).should().findByUserId(userId);
+        then(pointRepository).should().save(any(Point.class));
+    }
+
+    @Test
+    void 음수_금액으로_포인트를_사용할_수_없다() {
+        // given
+        Long negativeAmount = -100000L;
+        given(pointRepository.findByUserId(userId)).willReturn(Optional.of(point));
+
+        // when & then
+        assertThatThrownBy(() -> pointService.usePoint(userId, negativeAmount))
+                .isInstanceOf(NegativeUsePointException.class);
+    }
+
+    @Test
+    void 잔액보다_많은_포인트를_사용할_수_없다() {
+        // given
+        Long useAmount = 1500000L; // 잔액(1000000L)보다 많은 금액
+        given(pointRepository.findByUserId(userId)).willReturn(Optional.of(point));
+
+        // when & then
+        assertThatThrownBy(() -> pointService.usePoint(userId, useAmount))
+                .isInstanceOf(NotEnoughPointException.class);
+    }
+
+    @Test
+    void 존재하지_않는_사용자가_포인트를_사용할_수_없다() {
+        // given
+        Long nonExistentUserId = 999L;
+        Long useAmount = 100000L;
+        given(pointRepository.findByUserId(nonExistentUserId)).willReturn(Optional.empty());
+
+        // when & then
+        assertThatThrownBy(() -> pointService.usePoint(nonExistentUserId, useAmount))
                 .isInstanceOf(NotFoundUserException.class);
     }
 }

@@ -1,4 +1,4 @@
-package kr.hhplus.be.server.config.jpa;
+package kr.hhplus.be.server.infrastructure.config.jpa;
 
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -9,7 +9,7 @@ import org.springframework.transaction.PlatformTransactionManager;
 
 @Configuration
 @EnableJpaAuditing
-@EnableJpaRepositories(basePackages = "kr.hhplus.be.server.infrastructure")
+@EnableJpaRepositories(basePackages = "kr.hhplus.be.server")
 public class JpaConfig {
 
     @Bean

@@ -2,6 +2,8 @@ package kr.hhplus.be.server.domain.point;
 
 import kr.hhplus.be.server.common.exception.ExceedsMaximumPointException;
 import kr.hhplus.be.server.common.exception.NegativeChargePointException;
+import kr.hhplus.be.server.common.exception.NegativeUsePointException;
+import kr.hhplus.be.server.common.exception.NotEnoughPointException;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
@@ -51,5 +53,61 @@ public class PointTest {
         // when & then
         assertThatThrownBy(() -> point.charge(chargeAmount))
                 .isInstanceOf(ExceedsMaximumPointException.class);
+    }
+
+    @Test
+    void 포인트_사용에_성공한다() {
+        // given
+        Long userId = 1L;
+        Long initialPoint = 100000L;
+        Long useAmount = 30000L;
+        Point point = Point.create(userId, initialPoint);
+
+        // when
+        point.use(useAmount);
+
+        // then
+        assertThat(point.getVolume()).isEqualTo(initialPoint - useAmount);
+    }
+
+    @ParameterizedTest
+    @ValueSource(longs = {-1000, -1, 0})
+    void 음수_또는_0포인트를_사용하면_예외가_발생한다(Long useAmount) {
+        // given
+        Long userId = 1L;
+        Long initialPoint = 10000L;
+        Point point = Point.create(userId, initialPoint);
+
+        // when & then
+        assertThatThrownBy(() -> point.use(useAmount))
+                .isInstanceOf(NegativeUsePointException.class);
+    }
+
+    @Test
+    void 보유_포인트보다_많은_포인트를_사용하면_예외가_발생한다() {
+        // given
+        Long userId = 1L;
+        Long initialPoint = 50000L;
+        Long useAmount = 70000L; // 보유 포인트보다 많은 금액
+        Point point = Point.create(userId, initialPoint);
+
+        // when & then
+        assertThatThrownBy(() -> point.use(useAmount))
+                .isInstanceOf(NotEnoughPointException.class);
+    }
+
+    @Test
+    void 보유_포인트와_정확히_같은_금액을_사용할_수_있다() {
+        // given
+        Long userId = 1L;
+        Long initialPoint = 50000L;
+        Long useAmount = 50000L; // 보유 포인트와 동일한 금액
+        Point point = Point.create(userId, initialPoint);
+
+        // when
+        point.use(useAmount);
+
+        // then
+        assertThat(point.getVolume()).isEqualTo(0L);
     }
 }

@@ -4,6 +4,8 @@ import jakarta.persistence.*;
 import kr.hhplus.be.server.common.BaseTimeEntity;
 import kr.hhplus.be.server.common.exception.ExceedsMaximumPointException;
 import kr.hhplus.be.server.common.exception.NegativeChargePointException;
+import kr.hhplus.be.server.common.exception.NegativeUsePointException;
+import kr.hhplus.be.server.common.exception.NotEnoughPointException;
 import lombok.AccessLevel;
 import lombok.Builder;
 import lombok.Getter;
@@ -59,6 +61,23 @@ public class Point extends BaseTimeEntity {
 
     public void addChargePointHistory(Long amount) {
         PointHistory pointHistory = PointHistory.create(this, amount, TransactionType.CHARGE);
+        this.pointHistories.add(pointHistory);
+    }
+
+    public void use(Long amount) {
+        if (amount <= 0) {
+            throw new NegativeUsePointException("사용 금액은 0보다 커야 합니다.");
+        }
+
+        if (this.volume < amount) {
+            throw new NotEnoughPointException("포인트가 부족합니다.");
+        }
+
+        this.volume -= amount;
+    }
+
+    public void addUsePointHistory(Long amount) {
+        PointHistory pointHistory = PointHistory.create(this, amount, TransactionType.USE);
         this.pointHistories.add(pointHistory);
     }
 }

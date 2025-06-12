@@ -27,7 +27,8 @@ public class Product extends BaseTimeEntity {
     private String description;
 
     @Builder
-    public Product(String name, Long price, Long stock, String description) {
+    public Product(Long id, String name, Long price, Long stock, String description) {
+        this.id = id;
         this.name = name;
         this.price = price;
         this.stock = stock;
