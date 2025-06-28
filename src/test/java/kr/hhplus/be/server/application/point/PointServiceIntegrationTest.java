@@ -1,6 +1,6 @@
 package kr.hhplus.be.server.application.point;
 
-import kr.hhplus.be.server.common.exception.NotFoundUserException;
+import kr.hhplus.be.server.common.exception.ApiException;
 import kr.hhplus.be.server.domain.point.Point;
 import kr.hhplus.be.server.domain.point.PointHistory;
 import kr.hhplus.be.server.domain.point.TransactionType;
@@ -15,6 +15,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static kr.hhplus.be.server.common.exception.ErrorCode.*;
 
 @SpringBootTest
 @Transactional
@@ -51,7 +52,8 @@ class PointServiceIntegrationTest {
         @Test
         void 존재하지_않는_사용자의_포인트를_조회하면_예외가_발생한다() {
             assertThatThrownBy(() -> pointService.getPoint(999L))
-                    .isInstanceOf(NotFoundUserException.class);
+                    .isInstanceOf(ApiException.class)
+                    .hasMessage(USER_NOT_FOUND.getMessage());
         }
     }
 
@@ -82,7 +84,8 @@ class PointServiceIntegrationTest {
         @Test
         void 존재하지_않는_사용자의_포인트를_충전하면_예외가_발생한다() {
             assertThatThrownBy(() -> pointService.chargePoint(999L, 5000L))
-                    .isInstanceOf(NotFoundUserException.class);
+                    .isInstanceOf(ApiException.class)
+                    .hasMessage(USER_NOT_FOUND.getMessage());
         }
     }
 
@@ -113,7 +116,8 @@ class PointServiceIntegrationTest {
         @Test
         void 존재하지_않는_사용자의_포인트를_사용하면_예외가_발생한다() {
             assertThatThrownBy(() -> pointService.usePoint(999L, 5000L))
-                    .isInstanceOf(NotFoundUserException.class);
+                    .isInstanceOf(ApiException.class)
+                    .hasMessage(USER_NOT_FOUND.getMessage());
         }
     }
 }

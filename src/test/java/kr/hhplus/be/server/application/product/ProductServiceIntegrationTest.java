@@ -1,6 +1,6 @@
 package kr.hhplus.be.server.application.product;
 
-import kr.hhplus.be.server.common.exception.NotFoundProductException;
+import kr.hhplus.be.server.common.exception.ApiException;
 import kr.hhplus.be.server.domain.product.Product;
 import kr.hhplus.be.server.infrastructure.persistence.product.ProductRepository;
 import org.junit.jupiter.api.BeforeEach;
@@ -14,6 +14,7 @@ import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static kr.hhplus.be.server.common.exception.ErrorCode.*;
 
 @SpringBootTest
 @Transactional
@@ -57,7 +58,8 @@ class ProductServiceIntegrationTest {
     void 존재하지_않는_상품을_조회하면_예외가_발생한다() {
         // when & then
         assertThatThrownBy(() -> productService.getProduct(999L))
-                .isInstanceOf(NotFoundProductException.class);
+                .isInstanceOf(ApiException.class)
+                .hasMessage(PRODUCT_NOT_FOUND.getMessage());
     }
 
     @Test

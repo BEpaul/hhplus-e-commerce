@@ -2,16 +2,15 @@ package kr.hhplus.be.server.application.order;
 
 import kr.hhplus.be.server.application.coupon.CouponService;
 import kr.hhplus.be.server.application.payment.PaymentService;
-import kr.hhplus.be.server.application.point.PointService;
 import kr.hhplus.be.server.application.product.ProductService;
-import kr.hhplus.be.server.common.exception.FailedPaymentException;
-import kr.hhplus.be.server.common.exception.OrderProductEmptyException;
+import kr.hhplus.be.server.common.exception.ApiException;
 import kr.hhplus.be.server.domain.order.Order;
 import kr.hhplus.be.server.domain.order.OrderProduct;
 import kr.hhplus.be.server.domain.order.OrderProductRepository;
 import kr.hhplus.be.server.domain.order.OrderRepository;
 import kr.hhplus.be.server.domain.order.OrderStatus;
 import kr.hhplus.be.server.domain.product.Product;
+import kr.hhplus.be.server.infrastructure.config.redis.DistributedLockService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
@@ -23,9 +22,11 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import java.util.ArrayList;
 import java.util.List;
 
+import static kr.hhplus.be.server.common.exception.ErrorCode.*;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.BDDMockito.then;
 import static org.mockito.Mockito.doNothing;
@@ -51,10 +52,10 @@ class OrderServiceTest {
     private ProductService productService;
 
     @Mock
-    private PointService pointService;
+    private PaymentService paymentService;
 
     @Mock
-    private PaymentService paymentService;
+    private DistributedLockService distributedLockService;
 
     @Nested
     class Describe_createOrder {
@@ -82,21 +83,35 @@ class OrderServiceTest {
                 .stock(10L)
                 .description("상품 설명")
                 .build();
+            
+            // 기본 모킹 설정
             lenient().when(productService.getProduct(1L)).thenReturn(product);
             lenient().when(productService.getProductWithPessimisticLock(1L)).thenReturn(product);
             lenient().when(orderRepository.save(any(Order.class))).thenReturn(order);
+            
+            // 분산락 모킹 설정 - 락을 성공적으로 획득하고 작업을 실행하도록 설정
+            lenient().when(distributedLockService.executeOrderLock(eq(1L), any())).thenAnswer(invocation -> {
+                return invocation.getArgument(1, java.util.function.Supplier.class).get();
+            });
+            lenient().when(distributedLockService.executeProductStockLock(eq(1L), any())).thenAnswer(invocation -> {
+                return invocation.getArgument(1, java.util.function.Supplier.class).get();
+            });
+            lenient().when(distributedLockService.executePaymentLock(any(), any())).thenAnswer(invocation -> {
+                return invocation.getArgument(1, java.util.function.Supplier.class).get();
+            });
         }
 
         @Test
         void 주문_상품이_없으면_예외가_발생한다() {
             assertThatThrownBy(() -> orderService.createOrder(order, new ArrayList<>()))
-                    .isInstanceOf(OrderProductEmptyException.class);
+                    .isInstanceOf(ApiException.class)
+                    .hasMessage(ORDER_PRODUCT_EMPTY.getMessage());
         }
 
         @Test
         void 주문이_성공적으로_생성된다() {
             // given
-            doNothing().when(paymentService).processPayment(any());
+            doNothing().when(paymentService).processPayment(any(), eq(1L));
 
             // when
             Order result = orderService.createOrder(order, orderProducts);
@@ -106,7 +121,9 @@ class OrderServiceTest {
             assertThat(result.getStatus()).isEqualTo(OrderStatus.COMPLETED);
             then(orderRepository).should().save(order);
             then(orderProductRepository).should().save(any(OrderProduct.class));
-            then(pointService).should().usePoint(order.getUserId(), 20000L);
+            then(paymentService).should().processPayment(any(), eq(1L));
+            then(distributedLockService).should().executeOrderLock(eq(1L), any());
+            then(distributedLockService).should().executeProductStockLock(eq(1L), any());
         }
 
         @Test
@@ -117,7 +134,7 @@ class OrderServiceTest {
                 .userCouponId(1L)
                 .build();
             given(couponService.calculateDiscountPrice(1L, 20000L)).willReturn(15000L);
-            doNothing().when(paymentService).processPayment(any());
+            doNothing().when(paymentService).processPayment(any(), eq(1L));
 
             // when
             Order result = orderService.createOrder(order, orderProducts);
@@ -126,18 +143,21 @@ class OrderServiceTest {
             assertThat(result).isNotNull();
             assertThat(result.getStatus()).isEqualTo(OrderStatus.COMPLETED);
             then(couponService).should().useCoupon(1L);
-            then(pointService).should().usePoint(order.getUserId(), 15000L);
+            then(paymentService).should().processPayment(any(), eq(1L));
+            then(distributedLockService).should().executeOrderLock(eq(1L), any());
+            then(distributedLockService).should().executeProductStockLock(eq(1L), any());
         }
 
         @Test
         void 결제가_실패하면_예외가_발생한다() {
             // given
-            doThrow(new FailedPaymentException("결제에 실패했습니다."))
-                .when(paymentService).processPayment(any());
+            doThrow(new ApiException(PAYMENT_FAILED))
+                .when(paymentService).processPayment(any(), eq(1L));
 
             // when & then
             assertThatThrownBy(() -> orderService.createOrder(order, orderProducts))
-                    .isInstanceOf(FailedPaymentException.class);
+                    .isInstanceOf(ApiException.class)
+                    .hasMessage(PAYMENT_FAILED.getMessage());
         }
     }
 } 

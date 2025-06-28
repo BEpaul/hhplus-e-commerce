@@ -1,13 +1,13 @@
 package kr.hhplus.be.server.domain.coupon;
 
-import kr.hhplus.be.server.common.exception.AlreadyUsedCouponException;
-import kr.hhplus.be.server.common.exception.ExpiredCouponException;
+import kr.hhplus.be.server.common.exception.ApiException;
 import org.junit.jupiter.api.Test;
 
 import java.time.LocalDateTime;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static kr.hhplus.be.server.common.exception.ErrorCode.*;
 
 class UserCouponTest {
 
@@ -42,7 +42,8 @@ class UserCouponTest {
 
         // when & then
         assertThatThrownBy(() -> userCoupon.use())
-                .isInstanceOf(AlreadyUsedCouponException.class);
+                .isInstanceOf(ApiException.class)
+                .hasMessage(ALREADY_USED_COUPON.getMessage());
     }
 
     @Test
@@ -58,6 +59,7 @@ class UserCouponTest {
 
         // when & then
         assertThatThrownBy(() -> userCoupon.isExpired())
-                .isInstanceOf(ExpiredCouponException.class);
+                .isInstanceOf(ApiException.class)
+                .hasMessage(EXPIRED_COUPON.getMessage());
     }
 } 

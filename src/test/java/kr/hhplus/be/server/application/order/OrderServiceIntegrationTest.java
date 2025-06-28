@@ -1,7 +1,6 @@
 package kr.hhplus.be.server.application.order;
 
-import kr.hhplus.be.server.common.exception.FailedPaymentException;
-import kr.hhplus.be.server.common.exception.OrderProductEmptyException;
+import kr.hhplus.be.server.common.exception.ApiException;
 import kr.hhplus.be.server.domain.coupon.*;
 import kr.hhplus.be.server.domain.order.Order;
 import kr.hhplus.be.server.domain.order.OrderProduct;
@@ -28,6 +27,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.BDDMockito.given;
+import static kr.hhplus.be.server.common.exception.ErrorCode.*;
 
 @SpringBootTest
 @Transactional
@@ -138,7 +138,8 @@ class OrderServiceIntegrationTest {
 
             // when & then
             assertThatThrownBy(() -> orderService.createOrder(order, List.of()))
-                    .isInstanceOf(OrderProductEmptyException.class);
+                    .isInstanceOf(ApiException.class)
+                    .hasMessage(ORDER_PRODUCT_EMPTY.getMessage());
         }
 
         @Test
@@ -157,7 +158,8 @@ class OrderServiceIntegrationTest {
 
             // when & then
             assertThatThrownBy(() -> orderService.createOrder(order, List.of(orderProduct)))
-                    .isInstanceOf(FailedPaymentException.class);
+                    .isInstanceOf(ApiException.class)
+                    .hasMessage(PAYMENT_FAILED.getMessage());
             assertThat(order.getStatus()).isEqualTo(OrderStatus.FAILED);
         }
     }

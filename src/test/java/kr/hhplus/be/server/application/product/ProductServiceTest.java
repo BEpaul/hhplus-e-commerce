@@ -1,6 +1,6 @@
 package kr.hhplus.be.server.application.product;
 
-import kr.hhplus.be.server.common.exception.NotFoundProductException;
+import kr.hhplus.be.server.common.exception.ApiException;
 import kr.hhplus.be.server.domain.product.Product;
 import kr.hhplus.be.server.infrastructure.persistence.product.ProductRepository;
 import org.junit.jupiter.api.Test;
@@ -16,6 +16,7 @@ import org.springframework.test.util.ReflectionTestUtils;
 import java.util.List;
 import java.util.Optional;
 
+import static kr.hhplus.be.server.common.exception.ErrorCode.*;
 
 @ExtendWith(MockitoExtension.class)
 class ProductServiceTest {
@@ -59,8 +60,8 @@ class ProductServiceTest {
 
         // when & then
         assertThatThrownBy(() -> productService.getProduct(productId))
-                .isInstanceOf(NotFoundProductException.class)
-                .hasMessage("상품이 존재하지 않습니다.");
+                .isInstanceOf(ApiException.class)
+                .hasMessage(PRODUCT_NOT_FOUND.getMessage());
     }
 
     @Test

@@ -1,6 +1,6 @@
 package kr.hhplus.be.server.application.coupon;
 
-import kr.hhplus.be.server.common.exception.OutOfStockCouponException;
+import kr.hhplus.be.server.common.exception.ApiException;
 import kr.hhplus.be.server.domain.coupon.Coupon;
 import kr.hhplus.be.server.domain.coupon.CouponRepository;
 import kr.hhplus.be.server.domain.coupon.DiscountType;
@@ -19,6 +19,7 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.atomic.AtomicInteger;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static kr.hhplus.be.server.common.exception.ErrorCode.OUT_OF_STOCK_COUPON;
 
 @SpringBootTest
 @ActiveProfiles("test")
@@ -66,8 +67,10 @@ class CouponConcurrencyTest {
                 try {
                     couponService.issueCoupon(userId, coupon.getId());
                     successCount.incrementAndGet();
-                } catch (OutOfStockCouponException e) {
-                    failCount.incrementAndGet();
+                } catch (ApiException e) {
+                    if (e.getErrorCode() == OUT_OF_STOCK_COUPON) {
+                        failCount.incrementAndGet();
+                    }
                 } finally {
                     latch.countDown();
                 }

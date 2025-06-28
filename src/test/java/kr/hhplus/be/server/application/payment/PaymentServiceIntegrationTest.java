@@ -1,13 +1,13 @@
 package kr.hhplus.be.server.application.payment;
 
-import kr.hhplus.be.server.common.exception.DuplicatePaymentException;
-import kr.hhplus.be.server.common.exception.NotExistPaymentInfoException;
-import kr.hhplus.be.server.common.exception.PaymentProcessException;
+import kr.hhplus.be.server.common.exception.ApiException;
 import kr.hhplus.be.server.domain.payment.Payment;
 import kr.hhplus.be.server.domain.payment.PaymentMethod;
 import kr.hhplus.be.server.domain.payment.PaymentRepository;
 import kr.hhplus.be.server.domain.payment.PaymentStatus;
+import kr.hhplus.be.server.domain.point.Point;
 import kr.hhplus.be.server.infrastructure.external.DataPlatform;
+import kr.hhplus.be.server.infrastructure.persistence.point.PointRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
@@ -21,6 +21,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.BDDMockito.given;
+import static kr.hhplus.be.server.common.exception.ErrorCode.*;
 
 @SpringBootTest
 @Transactional
@@ -33,16 +34,27 @@ class PaymentServiceIntegrationTest {
     @Autowired
     private PaymentRepository paymentRepository;
 
+    @Autowired
+    private PointRepository pointRepository;
+
     @MockitoBean
     private DataPlatform dataPlatform;
 
     private Long orderId;
     private Long amount;
+    private Long userId;
 
     @BeforeEach
     void setUp() {
         orderId = 1L;
         amount = 10000L;
+        userId = 1L;
+        // 포인트 생성
+        Point point = Point.builder()
+            .userId(userId)
+            .volume(50000L)
+            .build();
+        pointRepository.save(point);
     }
 
     @Nested
@@ -55,10 +67,13 @@ class PaymentServiceIntegrationTest {
             given(dataPlatform.sendData(any())).willReturn(true);
 
             // when
-            paymentService.processPayment(payment);
+            paymentService.processPayment(payment, userId);
 
             // then
             assertThat(payment.getStatus()).isEqualTo(PaymentStatus.APPROVED);
+            // 포인트 차감 검증
+            Point updated = pointRepository.findByUserId(userId).orElseThrow();
+            assertThat(updated.getVolume()).isEqualTo(40000L);
         }
 
         @Test
@@ -67,8 +82,9 @@ class PaymentServiceIntegrationTest {
             Payment payment = null;
 
             // when & then
-            assertThatThrownBy(() -> paymentService.processPayment(payment))
-                    .isInstanceOf(NotExistPaymentInfoException.class);
+            assertThatThrownBy(() -> paymentService.processPayment(payment, userId))
+                    .isInstanceOf(ApiException.class)
+                    .hasMessage(PAYMENT_INFO_NOT_EXIST.getMessage());
         }
 
         @Test
@@ -78,8 +94,9 @@ class PaymentServiceIntegrationTest {
             given(dataPlatform.sendData(any())).willReturn(false);
 
             // when & then
-            assertThatThrownBy(() -> paymentService.processPayment(payment))
-                    .isInstanceOf(PaymentProcessException.class);
+            assertThatThrownBy(() -> paymentService.processPayment(payment, userId))
+                    .isInstanceOf(ApiException.class)
+                    .hasMessage(PAYMENT_PROCESSING_FAILED.getMessage());
             assertThat(payment.getStatus()).isEqualTo(PaymentStatus.CANCELED);
         }
 
@@ -90,11 +107,12 @@ class PaymentServiceIntegrationTest {
             given(dataPlatform.sendData(any())).willReturn(true);
 
             // when
-            paymentService.processPayment(payment);
+            paymentService.processPayment(payment, userId);
 
             // then
-            assertThatThrownBy(() -> paymentService.processPayment(payment))
-                    .isInstanceOf(DuplicatePaymentException.class);
+            assertThatThrownBy(() -> paymentService.processPayment(payment, userId))
+                    .isInstanceOf(ApiException.class)
+                    .hasMessage(DUPLICATE_PAYMENT.getMessage());
         }
     }
 } 

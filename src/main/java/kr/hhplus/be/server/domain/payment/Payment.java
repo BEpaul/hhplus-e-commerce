@@ -63,4 +63,8 @@ public class Payment {
         this.status = PaymentStatus.CANCELED;
         this.canceledAt = LocalDateTime.now();
     }
+
+    public void pending() {
+        this.status = PaymentStatus.PENDING;
+    }
 } 

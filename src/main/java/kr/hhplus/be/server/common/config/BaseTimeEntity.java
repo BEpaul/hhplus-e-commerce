@@ -1,4 +1,4 @@
-package kr.hhplus.be.server.common;
+package kr.hhplus.be.server.common.config;
 
 import jakarta.persistence.Column;
 import jakarta.persistence.EntityListeners;

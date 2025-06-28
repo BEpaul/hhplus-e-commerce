@@ -1,7 +1,7 @@
 package kr.hhplus.be.server.domain.point;
 
 import jakarta.persistence.*;
-import kr.hhplus.be.server.common.BaseTimeEntity;
+import kr.hhplus.be.server.common.config.BaseTimeEntity;
 import lombok.AccessLevel;
 import lombok.Builder;
 import lombok.Getter;

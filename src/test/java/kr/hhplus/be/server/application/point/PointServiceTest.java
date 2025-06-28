@@ -1,11 +1,8 @@
 package kr.hhplus.be.server.application.point;
 
-import kr.hhplus.be.server.common.exception.ExceedsMaximumPointException;
-import kr.hhplus.be.server.common.exception.NegativeChargePointException;
-import kr.hhplus.be.server.common.exception.NegativeUsePointException;
-import kr.hhplus.be.server.common.exception.NotEnoughPointException;
-import kr.hhplus.be.server.common.exception.NotFoundUserException;
+import kr.hhplus.be.server.common.exception.ApiException;
 import kr.hhplus.be.server.domain.point.Point;
+import kr.hhplus.be.server.infrastructure.config.redis.DistributedLockService;
 import kr.hhplus.be.server.infrastructure.persistence.point.PointRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -19,8 +16,11 @@ import java.util.Optional;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.BDDMockito.then;
+import static org.mockito.Mockito.lenient;
+import static kr.hhplus.be.server.common.exception.ErrorCode.*;
 
 @ExtendWith(MockitoExtension.class)
 class PointServiceTest {
@@ -31,6 +31,9 @@ class PointServiceTest {
     @Mock
     private PointRepository pointRepository;
 
+    @Mock
+    private DistributedLockService distributedLockService;
+
     private Long userId;
     private Point point;
 
@@ -38,6 +41,11 @@ class PointServiceTest {
     void setUp() {
         userId = 1L;
         point = Point.create(userId, 1000000L);
+        
+        // 분산락 모킹 설정 - 락을 성공적으로 획득하고 작업을 실행하도록 설정
+        lenient().when(distributedLockService.executePointLock(any(), any())).thenAnswer(invocation -> {
+            return invocation.getArgument(1, java.util.function.Supplier.class).get();
+        });
     }
 
     @Test
@@ -54,6 +62,7 @@ class PointServiceTest {
         assertThat(point.getVolume()).isEqualTo(1500000L);
         then(pointRepository).should().findByUserId(userId);
         then(pointRepository).should().save(any(Point.class));
+        then(distributedLockService).should().executePointLock(eq(userId), any());
     }
 
     @Test
@@ -64,7 +73,9 @@ class PointServiceTest {
 
         // when & then
         assertThatThrownBy(() -> pointService.chargePoint(userId, negativeAmount))
-                .isInstanceOf(NegativeChargePointException.class);
+                .isInstanceOf(ApiException.class)
+                .hasMessage(NEGATIVE_CHARGE_POINT.getMessage());
+        then(distributedLockService).should().executePointLock(eq(userId), any());
     }
 
     @Test
@@ -77,7 +88,9 @@ class PointServiceTest {
 
         // when & then
         assertThatThrownBy(() -> pointService.chargePoint(userId, chargeAmount))
-                .isInstanceOf(ExceedsMaximumPointException.class);
+                .isInstanceOf(ApiException.class)
+                .hasMessage(EXCEEDS_MAXIMUM_POINT.getMessage());
+        then(distributedLockService).should().executePointLock(eq(userId), any());
     }
 
     @Test
@@ -103,7 +116,8 @@ class PointServiceTest {
 
         // when & then
         assertThatThrownBy(() -> pointService.getPoint(nonExistentUserId))
-                .isInstanceOf(NotFoundUserException.class);
+                .isInstanceOf(ApiException.class)
+                .hasMessage(USER_NOT_FOUND.getMessage());
     }
 
     @Test
@@ -120,6 +134,7 @@ class PointServiceTest {
         assertThat(result.getVolume()).isEqualTo(700000L);
         then(pointRepository).should().findByUserId(userId);
         then(pointRepository).should().save(any(Point.class));
+        then(distributedLockService).should().executePointLock(eq(userId), any());
     }
 
     @Test
@@ -130,7 +145,9 @@ class PointServiceTest {
 
         // when & then
         assertThatThrownBy(() -> pointService.usePoint(userId, negativeAmount))
-                .isInstanceOf(NegativeUsePointException.class);
+                .isInstanceOf(ApiException.class)
+                .hasMessage(NEGATIVE_USE_POINT.getMessage());
+        then(distributedLockService).should().executePointLock(eq(userId), any());
     }
 
     @Test
@@ -141,7 +158,9 @@ class PointServiceTest {
 
         // when & then
         assertThatThrownBy(() -> pointService.usePoint(userId, useAmount))
-                .isInstanceOf(NotEnoughPointException.class);
+                .isInstanceOf(ApiException.class)
+                .hasMessage(NOT_ENOUGH_POINT.getMessage());
+        then(distributedLockService).should().executePointLock(eq(userId), any());
     }
 
     @Test
@@ -153,6 +172,8 @@ class PointServiceTest {
 
         // when & then
         assertThatThrownBy(() -> pointService.usePoint(nonExistentUserId, useAmount))
-                .isInstanceOf(NotFoundUserException.class);
+                .isInstanceOf(ApiException.class)
+                .hasMessage(USER_NOT_FOUND.getMessage());
+        then(distributedLockService).should().executePointLock(eq(nonExistentUserId), any());
     }
 }

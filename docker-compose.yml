@@ -51,3 +51,11 @@ services:
       - K6_OUT=influxdb=http://influxdb:8086/k6
     volumes:
       - ./k6:/scripts
+
+  redis:
+    image: redis:latest
+    ports:
+      - "6379:6379"
+    volumes:
+      - ./data/redis:/data
+    restart: always

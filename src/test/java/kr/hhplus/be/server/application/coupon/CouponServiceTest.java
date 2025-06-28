@@ -1,13 +1,12 @@
 package kr.hhplus.be.server.application.coupon;
 
-import kr.hhplus.be.server.common.exception.AlreadyUsedCouponException;
-import kr.hhplus.be.server.common.exception.NotOwnedUserCouponException;
-import kr.hhplus.be.server.common.exception.OutOfStockCouponException;
+import kr.hhplus.be.server.common.exception.ApiException;
 import kr.hhplus.be.server.domain.coupon.Coupon;
 import kr.hhplus.be.server.domain.coupon.DiscountType;
 import kr.hhplus.be.server.domain.coupon.UserCoupon;
 import kr.hhplus.be.server.domain.coupon.UserCouponRepository;
 import kr.hhplus.be.server.domain.coupon.CouponRepository;
+import kr.hhplus.be.server.infrastructure.config.redis.DistributedLockService;
 import kr.hhplus.be.server.interfaces.web.coupon.dto.response.CouponListResponse;
 import kr.hhplus.be.server.interfaces.web.coupon.dto.response.CouponResponse;
 import org.junit.jupiter.api.BeforeEach;
@@ -26,7 +25,10 @@ import java.util.Optional;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.BDDMockito.*;
+import static org.mockito.Mockito.lenient;
+import static kr.hhplus.be.server.common.exception.ErrorCode.*;
 
 @ExtendWith(MockitoExtension.class)
 class CouponServiceTest {
@@ -36,6 +38,9 @@ class CouponServiceTest {
 
     @Mock
     private CouponRepository couponRepository;
+
+    @Mock
+    private DistributedLockService distributedLockService;
 
     @InjectMocks
     private CouponService couponService;
@@ -67,6 +72,14 @@ class CouponServiceTest {
             .startDate(LocalDateTime.now().minusDays(1))
             .endDate(LocalDateTime.now().plusDays(30))
             .build();
+            
+        // 분산락 모킹 설정 - 락을 성공적으로 획득하고 작업을 실행하도록 설정
+        lenient().when(distributedLockService.executePointLock(any(), any())).thenAnswer(invocation -> {
+            return invocation.getArgument(1, java.util.function.Supplier.class).get();
+        });
+        lenient().when(distributedLockService.executeWithLock(any(String.class), any(Long.class), any(Long.class), any(java.util.function.Supplier.class))).thenAnswer(invocation -> {
+            return invocation.getArgument(3, java.util.function.Supplier.class).get();
+        });
     }
 
     @Test
@@ -82,6 +95,7 @@ class CouponServiceTest {
         // then
         then(userCouponRepository).should(times(1)).findById(userCouponId);
         then(userCouponRepository).should(times(1)).save(any(UserCoupon.class));
+        then(distributedLockService).should().executePointLock(eq(userId), any());
     }
 
     @Test
@@ -93,7 +107,8 @@ class CouponServiceTest {
 
         // when & then
         assertThatThrownBy(() -> couponService.useCoupon(userCouponId))
-                .isInstanceOf(NotOwnedUserCouponException.class);
+                .isInstanceOf(ApiException.class)
+                .hasMessage(NOT_OWNED_USER_COUPON.getMessage());
 
         then(userCouponRepository).should(times(1)).findById(userCouponId);
         then(userCouponRepository).should(never()).save(any(UserCoupon.class));
@@ -116,8 +131,8 @@ class CouponServiceTest {
 
         // when & then
         assertThatThrownBy(() -> couponService.useCoupon(userCouponId))
-            .isInstanceOf(AlreadyUsedCouponException.class)
-            .hasMessage("이미 사용된 쿠폰입니다.");
+            .isInstanceOf(ApiException.class)
+            .hasMessage(ALREADY_USED_COUPON.getMessage());
 
         then(userCouponRepository).should(times(1)).findById(userCouponId);
         then(userCouponRepository).should(never()).save(any(UserCoupon.class));
@@ -140,6 +155,7 @@ class CouponServiceTest {
         
         then(couponRepository).should(times(1)).findById(couponId);
         then(userCouponRepository).should(times(1)).save(any(UserCoupon.class));
+        then(distributedLockService).should().executeWithLock(eq("coupon:issue:" + couponId), eq(10L), eq(30L), any(java.util.function.Supplier.class));
     }
 
     @Test
@@ -159,10 +175,12 @@ class CouponServiceTest {
 
         // when & then
         assertThatThrownBy(() -> couponService.issueCoupon(userId, couponId))
-                .isInstanceOf(OutOfStockCouponException.class);
+                .isInstanceOf(ApiException.class)
+                .hasMessage(OUT_OF_STOCK_COUPON.getMessage());
 
         then(couponRepository).should(times(1)).findById(couponId);
         then(userCouponRepository).should(never()).save(any(UserCoupon.class));
+        then(distributedLockService).should().executeWithLock(eq("coupon:issue:" + couponId), eq(10L), eq(30L), any(java.util.function.Supplier.class));
     }
 
     @Test

@@ -1,14 +1,15 @@
 package kr.hhplus.be.server.domain.coupon;
 
 import jakarta.persistence.*;
-import kr.hhplus.be.server.common.exception.AlreadyUsedCouponException;
-import kr.hhplus.be.server.common.exception.ExpiredCouponException;
+import kr.hhplus.be.server.common.exception.ApiException;
 import lombok.AccessLevel;
 import lombok.Builder;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 
 import java.time.LocalDateTime;
+
+import static kr.hhplus.be.server.common.exception.ErrorCode.*;
 
 @Entity
 @Getter
@@ -35,7 +36,7 @@ public class UserCoupon {
 
     public void use() {
         if (this.isUsed) {
-            throw new AlreadyUsedCouponException("이미 사용된 쿠폰입니다.");
+            throw new ApiException(ALREADY_USED_COUPON);
         }
 
         this.isUsed = true;
@@ -43,7 +44,7 @@ public class UserCoupon {
 
     public void isExpired() {
         if (LocalDateTime.now().isAfter(this.expiredAt)) {
-            throw new ExpiredCouponException("쿠폰이 만료되었습니다.");
+            throw new ApiException(EXPIRED_COUPON);
         }
     }
 

@@ -1,15 +1,13 @@
 package kr.hhplus.be.server.domain.point;
 
-import kr.hhplus.be.server.common.exception.ExceedsMaximumPointException;
-import kr.hhplus.be.server.common.exception.NegativeChargePointException;
-import kr.hhplus.be.server.common.exception.NegativeUsePointException;
-import kr.hhplus.be.server.common.exception.NotEnoughPointException;
+import kr.hhplus.be.server.common.exception.ApiException;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static kr.hhplus.be.server.common.exception.ErrorCode.*;
 
 public class PointTest {
 
@@ -38,7 +36,8 @@ public class PointTest {
 
         // when & then
         assertThatThrownBy(() -> point.charge(chargeAmount))
-                .isInstanceOf(NegativeChargePointException.class);
+                .isInstanceOf(ApiException.class)
+                .hasMessage(NEGATIVE_CHARGE_POINT.getMessage());
     }
 
     @Test
@@ -52,7 +51,8 @@ public class PointTest {
 
         // when & then
         assertThatThrownBy(() -> point.charge(chargeAmount))
-                .isInstanceOf(ExceedsMaximumPointException.class);
+                .isInstanceOf(ApiException.class)
+                .hasMessage(EXCEEDS_MAXIMUM_POINT.getMessage());
     }
 
     @Test
@@ -80,7 +80,8 @@ public class PointTest {
 
         // when & then
         assertThatThrownBy(() -> point.use(useAmount))
-                .isInstanceOf(NegativeUsePointException.class);
+                .isInstanceOf(ApiException.class)
+                .hasMessage(NEGATIVE_USE_POINT.getMessage());
     }
 
     @Test
@@ -93,7 +94,8 @@ public class PointTest {
 
         // when & then
         assertThatThrownBy(() -> point.use(useAmount))
-                .isInstanceOf(NotEnoughPointException.class);
+                .isInstanceOf(ApiException.class)
+                .hasMessage(NOT_ENOUGH_POINT.getMessage());
     }
 
     @Test

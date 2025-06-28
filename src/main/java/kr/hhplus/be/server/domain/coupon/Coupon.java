@@ -1,13 +1,15 @@
 package kr.hhplus.be.server.domain.coupon;
 
 import jakarta.persistence.*;
-import kr.hhplus.be.server.common.exception.NotSupportedDiscountTypeException;
+import kr.hhplus.be.server.common.exception.ApiException;
 import lombok.AccessLevel;
 import lombok.Builder;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 
 import java.time.LocalDateTime;
+
+import static kr.hhplus.be.server.common.exception.ErrorCode.NOT_SUPPORTED_DISCOUNT_TYPE;
 
 @Entity
 @Getter
@@ -49,7 +51,7 @@ public class Coupon {
             return productPrice - (productPrice * discountValue / 100);
         }
 
-        throw new NotSupportedDiscountTypeException("지원하지 않는 할인 유형입니다.");
+        throw new ApiException(NOT_SUPPORTED_DISCOUNT_TYPE);
     }
 
     public void decreaseStock() {

@@ -1,6 +1,6 @@
 package kr.hhplus.be.server.application.product;
 
-import kr.hhplus.be.server.common.exception.NotFoundProductException;
+import kr.hhplus.be.server.common.exception.ApiException;
 import kr.hhplus.be.server.domain.product.Product;
 import kr.hhplus.be.server.infrastructure.persistence.product.ProductRepository;
 import lombok.RequiredArgsConstructor;
@@ -8,6 +8,8 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
+
+import static kr.hhplus.be.server.common.exception.ErrorCode.*;
 
 @Service
 @RequiredArgsConstructor
@@ -21,7 +23,7 @@ public class ProductService {
      */
     public Product getProduct(Long productId) {
         return productRepository.findById(productId)
-                .orElseThrow(() -> new NotFoundProductException("상품이 존재하지 않습니다."));
+                .orElseThrow(() -> new ApiException(PRODUCT_NOT_FOUND));
 
     }
 
@@ -38,6 +40,6 @@ public class ProductService {
     @Transactional
     public Product getProductWithPessimisticLock(Long productId) {
         return productRepository.findByIdWithPessimisticLock(productId)
-                .orElseThrow(() -> new NotFoundProductException("상품이 존재하지 않습니다."));
+                .orElseThrow(() -> new ApiException(PRODUCT_NOT_FOUND));
     }
 }

@@ -1,6 +1,6 @@
 package kr.hhplus.be.server.domain.product;
 
-import kr.hhplus.be.server.common.exception.OutOfStockException;
+import kr.hhplus.be.server.common.exception.ApiException;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -8,6 +8,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static kr.hhplus.be.server.common.exception.ErrorCode.*;
 
 class ProductTest {
 
@@ -47,7 +48,8 @@ class ProductTest {
 
         // when & then
         assertThatThrownBy(() -> product.decreaseStock(orderQuantity))
-                .isInstanceOf(OutOfStockException.class);
+                .isInstanceOf(ApiException.class)
+                .hasMessage(OUT_OF_STOCK_PRODUCT.getMessage());
 
         assertThat(product.getStock()).isEqualTo(stock);
     }

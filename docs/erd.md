@@ -110,8 +110,6 @@ erDiagram
         BIGINT bestseller_id PK
         BIGINT product_id FK
         VARCHAR name
-        BIGINT price
-        BIGINT stock
         TINYINT ranking
         DATETIME top_date
         DATETIME created_at
@@ -276,8 +274,7 @@ CREATE TABLE `point_history` (
 CREATE TABLE `bestseller` (
     `bestseller_id` BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
     `name` VARCHAR(50) NOT NULL,
-    `price` BIGINT NOT NULL,
-    `stock` BIGINT NOT NULL,
+    `price_id` BIGINT NOT NULL,
     `ranking` TINYINT NOT NULL,
     `top_date` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     `created_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,

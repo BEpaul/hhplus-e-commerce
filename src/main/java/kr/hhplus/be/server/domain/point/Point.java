@@ -1,11 +1,8 @@
 package kr.hhplus.be.server.domain.point;
 
 import jakarta.persistence.*;
-import kr.hhplus.be.server.common.BaseTimeEntity;
-import kr.hhplus.be.server.common.exception.ExceedsMaximumPointException;
-import kr.hhplus.be.server.common.exception.NegativeChargePointException;
-import kr.hhplus.be.server.common.exception.NegativeUsePointException;
-import kr.hhplus.be.server.common.exception.NotEnoughPointException;
+import kr.hhplus.be.server.common.config.BaseTimeEntity;
+import kr.hhplus.be.server.common.exception.*;
 import lombok.AccessLevel;
 import lombok.Builder;
 import lombok.Getter;
@@ -13,6 +10,8 @@ import lombok.NoArgsConstructor;
 
 import java.util.ArrayList;
 import java.util.List;
+
+import static kr.hhplus.be.server.common.exception.ErrorCode.*;
 
 
 @Entity
@@ -49,11 +48,11 @@ public class Point extends BaseTimeEntity {
 
     public void charge(Long amount) {
         if (amount <= 0) {
-            throw new NegativeChargePointException("충전 금액은 0보다 커야 합니다.");
+            throw new ApiException(NEGATIVE_CHARGE_POINT);
         }
 
         if (this.volume + amount > 3_000_000) {
-            throw new ExceedsMaximumPointException("충전 후 포인트가 300만을 초과할 수 없습니다.");
+            throw new ApiException(EXCEEDS_MAXIMUM_POINT);
         }
 
         this.volume += amount;
@@ -66,11 +65,11 @@ public class Point extends BaseTimeEntity {
 
     public void use(Long amount) {
         if (amount <= 0) {
-            throw new NegativeUsePointException("사용 금액은 0보다 커야 합니다.");
+            throw new ApiException(NEGATIVE_USE_POINT);
         }
 
         if (this.volume < amount) {
-            throw new NotEnoughPointException("포인트가 부족합니다.");
+            throw new ApiException(NOT_ENOUGH_POINT);
         }
 
         this.volume -= amount;

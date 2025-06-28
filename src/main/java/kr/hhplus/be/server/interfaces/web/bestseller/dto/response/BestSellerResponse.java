@@ -9,16 +9,14 @@ import lombok.Getter;
 public class BestSellerResponse {
     private Long id;
     private String name;
-    private Long price;
-    private Long stock;
+    private Long productId;
     private Long ranking;
 
     public static BestSellerResponse from(BestSeller bestSeller) {
         return BestSellerResponse.builder()
                 .id(bestSeller.getId())
                 .name(bestSeller.getName())
-                .price(bestSeller.getPrice())
-                .stock(bestSeller.getStock())
+                .productId(bestSeller.getProductId())
                 .ranking(bestSeller.getRanking())
                 .build();
     }
