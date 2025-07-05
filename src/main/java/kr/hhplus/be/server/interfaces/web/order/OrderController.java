@@ -25,7 +25,7 @@ public class OrderController {
     @Operation(summary = "주문 생성", description = "사용자가 상품을 주문합니다.")
     @PostMapping
     public ApiResponse<OrderResponse> createOrder(@Valid @RequestBody OrderRequest request) {
-        Order savedOrder = orderService.createOrder(
+        Order savedOrder = orderService.placeOrder(
                 request.toOrder(),
                 request.toOrderProducts()
         );

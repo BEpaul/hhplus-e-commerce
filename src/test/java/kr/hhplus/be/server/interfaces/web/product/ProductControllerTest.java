@@ -37,6 +37,7 @@ class ProductControllerTest {
                 .name("상품 A")
                 .price(10000L)
                 .stock(50L)
+                .salesCount(0L)
                 .description("상품 A의 상세 설명입니다.")
                 .build();
         given(productService.getProduct(productId)).willReturn(product);
@@ -61,6 +62,7 @@ class ProductControllerTest {
                 .name("상품 A")
                 .price(10000L)
                 .stock(50L)
+                .salesCount(0L)
                 .description("상품 A의 상세 설명입니다.")
                 .build();
 
@@ -69,6 +71,7 @@ class ProductControllerTest {
                 .name("상품 B")
                 .price(20000L)
                 .stock(30L)
+                .salesCount(0L)
                 .description("상품 B의 상세 설명입니다.")
                 .build();
 

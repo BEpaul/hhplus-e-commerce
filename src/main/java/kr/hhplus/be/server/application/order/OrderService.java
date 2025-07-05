@@ -1,5 +1,6 @@
 package kr.hhplus.be.server.application.order;
 
+import kr.hhplus.be.server.application.bestseller.BestSellerRankingService;
 import kr.hhplus.be.server.application.coupon.CouponService;
 import kr.hhplus.be.server.application.payment.PaymentService;
 import kr.hhplus.be.server.application.product.ProductService;
@@ -32,6 +33,7 @@ public class OrderService {
     private final ProductService productService;
     private final PaymentService paymentService;
     private final DistributedLockService distributedLockService;
+    private final BestSellerRankingService bestSellerRankingService;
 
     /**
      * 주문 생성
@@ -47,7 +49,7 @@ public class OrderService {
      * 10. 주문 상태 업데이트
      */
     @Transactional
-    public Order createOrder(Order order, List<OrderProduct> orderProducts) {
+    public Order placeOrder(Order order, List<OrderProduct> orderProducts) {
         return distributedLockService.executeOrderLock(order.getUserId(), () -> {
             log.info("주문 생성 시작 - 사용자 ID: {}", order.getUserId());
             
@@ -58,8 +60,11 @@ public class OrderService {
             processCouponUsage(order);
 
             Order savedOrder = saveOrder(order, totalPrice);
-            processPayment(savedOrder, totalPrice);
+            initiatePayment(savedOrder, totalPrice);
             saveOrderProducts(savedOrder, orderProducts);
+            
+            // 베스트셀러 랭킹 업데이트
+            updateBestSellerRanking(orderProducts);
 
             log.info("주문 생성 완료 - 주문 ID: {}, 사용자 ID: {}", savedOrder.getId(), order.getUserId());
             return savedOrder;
@@ -116,17 +121,13 @@ public class OrderService {
     }
 
     /**
-     * 결제 처리
+     * 결제 처리 시작
      */
-    private void processPayment(Order order, long totalPrice) {
+    private void initiatePayment(Order order, long totalPrice) {
         try {
             Payment payment = Payment.create(order.getId(), PaymentMethod.POINT, totalPrice);
             
-            // 결제별 분산락 적용
-            distributedLockService.executePaymentLock(payment.getId(), () -> {
-                paymentService.processPayment(payment, order.getUserId());
-                return null;
-            });
+            paymentService.processPayment(payment, order.getUserId());
             
             order.success();
             log.info("결제 처리 완료 - 주문 ID: {}, 결제 ID: {}", order.getId(), payment.getId());
@@ -142,6 +143,23 @@ public class OrderService {
             Product product = productService.getProduct(orderProduct.getProductId());
             orderProduct.assignOrderInfo(order.getId(), product.getPrice());
             orderProductRepository.save(orderProduct);
+        }
+    }
+    
+    /**
+     * 베스트셀러 랭킹 업데이트
+     */
+    private void updateBestSellerRanking(List<OrderProduct> orderProducts) {
+        try {
+            for (OrderProduct orderProduct : orderProducts) {
+                bestSellerRankingService.incrementTodaySales(
+                    orderProduct.getProductId(), 
+                    orderProduct.getQuantity()
+                );
+            }
+            log.info("베스트셀러 랭킹 업데이트 완료 - 주문 상품 수: {}", orderProducts.size());
+        } catch (Exception e) {
+            log.error("베스트셀러 랭킹 업데이트 실패", e);
         }
     }
 }

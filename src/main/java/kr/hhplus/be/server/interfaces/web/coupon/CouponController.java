@@ -7,6 +7,7 @@ import kr.hhplus.be.server.common.response.ApiResponse;
 import kr.hhplus.be.server.domain.coupon.UserCoupon;
 import kr.hhplus.be.server.interfaces.web.coupon.dto.request.CouponIssueRequest;
 import kr.hhplus.be.server.interfaces.web.coupon.dto.request.CouponIssueResponse;
+import kr.hhplus.be.server.interfaces.web.coupon.dto.response.CouponIssueStatusResponse;
 import kr.hhplus.be.server.interfaces.web.coupon.dto.response.CouponListResponse;
 import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.*;
@@ -25,6 +26,27 @@ public class CouponController {
         UserCoupon userCoupon = couponService.issueCoupon(request.getUserId(), request.getCouponId());
 
         return ApiResponse.success(CouponIssueResponse.from(userCoupon.getId()), "쿠폰 발급 성공");
+    }
+
+    @Operation(summary = "쿠폰 발급 상태 조회", description = "사용자의 쿠폰 발급 순위와 상태를 조회합니다.")
+    @GetMapping("/coupons/{couponId}/status")
+    public ApiResponse<CouponIssueStatusResponse> getCouponIssueStatus(
+            @PathVariable Long couponId,
+            @RequestParam Long userId) {
+        
+        Long issueRank = couponService.getIssueRank(couponId, userId);
+        Long issuedCount = couponService.getIssuedCount(couponId);
+        
+        CouponIssueStatusResponse response = CouponIssueStatusResponse.builder()
+                .couponId(couponId)
+                .userId(userId)
+                .issueRank(issueRank)
+                .issuedCount(issuedCount)
+                .totalLimit(issuedCount) // 실제로는 쿠폰의 총 제한 수를 가져와야 함
+                .isIssued(issueRank != null && issueRank >= 0)
+                .build();
+
+        return ApiResponse.success(response, "쿠폰 발급 상태 조회 성공");
     }
 
     @Operation(summary = "쿠폰 목록 조회", description = "사용자가 보유한 쿠폰 목록을 조회합니다.")

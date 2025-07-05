@@ -5,14 +5,10 @@ import kr.hhplus.be.server.domain.coupon.Coupon;
 import kr.hhplus.be.server.domain.coupon.CouponRepository;
 import kr.hhplus.be.server.domain.coupon.UserCoupon;
 import kr.hhplus.be.server.domain.coupon.UserCouponRepository;
-import kr.hhplus.be.server.infrastructure.config.redis.DistributedLockService;
 import kr.hhplus.be.server.interfaces.web.coupon.dto.response.CouponListResponse;
 import kr.hhplus.be.server.interfaces.web.coupon.dto.response.CouponResponse;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.dao.OptimisticLockingFailureException;
-import org.springframework.retry.annotation.Backoff;
-import org.springframework.retry.annotation.Retryable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -28,25 +24,21 @@ public class CouponService {
 
     private final CouponRepository couponRepository;
     private final UserCouponRepository userCouponRepository;
-    private final DistributedLockService distributedLockService;
+    private final CouponRedisService couponRedisService;
+    private final CouponEventService couponEventService;
 
     /**
      * 쿠폰 사용
      */
     @Transactional
     public void useCoupon(Long userCouponId) {
-        UserCoupon userCoupon = findUserCouponById(userCouponId);
+        log.info("쿠폰 사용 시작 - 사용자 쿠폰 ID: {}", userCouponId);
         
-        // 사용자별 분산락 적용
-        distributedLockService.executePointLock(userCoupon.getUserId(), () -> {
-            log.info("쿠폰 사용 시작 - 사용자 쿠폰 ID: {}, 사용자 ID: {}", userCouponId, userCoupon.getUserId());
-            
-            userCoupon.use();
-            userCouponRepository.save(userCoupon);
-            
-            log.info("쿠폰 사용 완료 - 사용자 쿠폰 ID: {}", userCouponId);
-            return null;
-        });
+        UserCoupon userCoupon = findUserCouponById(userCouponId);
+        userCoupon.use();
+        userCouponRepository.save(userCoupon);
+        
+        log.info("쿠폰 사용 완료 - 사용자 쿠폰 ID: {}", userCouponId);
     }
 
     @Transactional
@@ -59,35 +51,52 @@ public class CouponService {
     }
 
     /**
-     * 쿠폰 발급
+     * 쿠폰 발급 (Redis 기반 선착순 처리 + 비동기 RDB 동기화)
      */
     @Transactional
-    @Retryable(
-            value = OptimisticLockingFailureException.class,
-            maxAttempts = 5,
-            backoff = @Backoff(delay = 10)
-    )
     public UserCoupon issueCoupon(Long userId, Long couponId) {
-        // 쿠폰별 분산락 적용
-        return distributedLockService.executeWithLock("coupon:issue:" + couponId, 10, 30, () -> {
-            log.info("쿠폰 발급 시작 - 사용자 ID: {}, 쿠폰 ID: {}", userId, couponId);
-            
-            Coupon coupon = findCouponById(couponId);
+        log.info("쿠폰 발급 시작 - 사용자 ID: {}, 쿠폰 ID: {}", userId, couponId);
+        
+        Coupon coupon = findCouponById(couponId);
 
-            if (coupon.getStock() <= 0) {
-                log.warn("쿠폰 재고 부족 - 쿠폰 ID: {}", couponId);
-                throw new ApiException(OUT_OF_STOCK_COUPON);
-            }
+        // 1. 쿠폰 수량 제한을 Redis에 설정 (최초 1회)
+        if (couponRedisService.getCouponLimit(couponId) == 0L) {
+            couponRedisService.setCouponLimit(couponId, coupon.getStock());
+        }
 
-            coupon.decreaseStock();
-            couponRepository.save(coupon);
-            
-            UserCoupon userCoupon = UserCoupon.of(userId, couponId);
-            UserCoupon savedUserCoupon = userCouponRepository.save(userCoupon);
-            
-            log.info("쿠폰 발급 완료 - 사용자 ID: {}, 쿠폰 ID: {}, 남은 재고: {}", userId, couponId, coupon.getStock());
-            return savedUserCoupon;
-        });
+        // 2. Redis를 통한 선착순 쿠폰 발급 시도
+        boolean isIssued = couponRedisService.tryIssueCoupon(couponId, userId);
+        
+        if (!isIssued) {
+            log.warn("쿠폰 발급 실패 - 사용자 ID: {}, 쿠폰 ID: {}", userId, couponId);
+            throw new ApiException(COUPON_ISSUANCE_FAILED);
+        }
+
+        // 3. Redis 발급 성공 시 RDB에 UserCoupon 저장
+        UserCoupon userCoupon = UserCoupon.of(userId, couponId);
+        UserCoupon savedUserCoupon = userCouponRepository.save(userCoupon);
+        
+        // 4. 쿠폰 발급 완료 이벤트 발행 (비동기 RDB 동기화용)
+        couponEventService.publishCouponIssuedEvent(couponId, userId, savedUserCoupon.getId());
+        
+        log.info("쿠폰 발급 완료 - 사용자 ID: {}, 쿠폰 ID: {}, UserCoupon ID: {}", 
+            userId, couponId, savedUserCoupon.getId());
+        
+        return savedUserCoupon;
+    }
+
+    /**
+     * 쿠폰 발급 순위 조회
+     */
+    public Long getIssueRank(Long couponId, Long userId) {
+        return couponRedisService.getIssueRank(couponId, userId);
+    }
+
+    /**
+     * 쿠폰 발급 완료 수 조회
+     */
+    public Long getIssuedCount(Long couponId) {
+        return couponRedisService.getIssuedCount(couponId);
     }
 
     /**

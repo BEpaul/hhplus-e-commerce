@@ -23,6 +23,7 @@ class ProductTest {
                 .name("상품 A")
                 .price(10000L)
                 .stock(stock)
+                .salesCount(0L)
                 .description("상품 A 설명")
                 .build();
 
@@ -43,6 +44,7 @@ class ProductTest {
                 .name("상품 A")
                 .price(10000L)
                 .stock(stock)
+                .salesCount(0L)
                 .description("상품 A 설명")
                 .build();
 

@@ -35,8 +35,10 @@ public class DistributedLockService {
                     log.debug("락 획득 성공 - 키: {}", lockKey);
                     return task.get();
                 } finally {
-                    lock.unlock();
-                    log.debug("락 해제 완료 - 키: {}", lockKey);
+                    if (lock.isHeldByCurrentThread()) {
+                        lock.unlock();
+                        log.debug("락 해제 완료 - 키: {}", lockKey);
+                    }
                 }
             } else {
                 log.warn("락 획득 실패 - 키: {}", lockKey);

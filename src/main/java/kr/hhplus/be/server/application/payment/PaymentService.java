@@ -6,10 +6,9 @@ import kr.hhplus.be.server.domain.payment.Payment;
 import kr.hhplus.be.server.domain.payment.PaymentMethod;
 import kr.hhplus.be.server.domain.payment.PaymentRepository;
 import kr.hhplus.be.server.infrastructure.config.redis.DistributedLockService;
-import kr.hhplus.be.server.infrastructure.external.DataPlatform;
+import kr.hhplus.be.server.infrastructure.external.payment.DataPlatform;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 

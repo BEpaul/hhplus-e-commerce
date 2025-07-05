@@ -6,7 +6,7 @@ import kr.hhplus.be.server.domain.order.OrderRepository;
 import kr.hhplus.be.server.domain.order.OrderStatus;
 import kr.hhplus.be.server.domain.point.Point;
 import kr.hhplus.be.server.domain.product.Product;
-import kr.hhplus.be.server.infrastructure.external.DataPlatform;
+import kr.hhplus.be.server.infrastructure.external.payment.DataPlatform;
 import kr.hhplus.be.server.infrastructure.persistence.point.PointRepository;
 import kr.hhplus.be.server.infrastructure.persistence.product.ProductRepository;
 import org.junit.jupiter.api.BeforeEach;
@@ -65,6 +65,7 @@ class OrderConcurrencyTest {
                 .name("동시성 테스트 상품")
                 .price(10000L)
                 .stock(10L)
+                .salesCount(0L)
                 .description("동시성 테스트용 상품")
                 .build();
         productId = productRepository.save(product).getId();
@@ -103,7 +104,7 @@ class OrderConcurrencyTest {
                             .quantity((long) quantityPerOrder)
                             .build();
 
-                    Order savedOrder = orderService.createOrder(order, List.of(orderProduct));
+                    Order savedOrder = orderService.placeOrder(order, List.of(orderProduct));
                     successCount.incrementAndGet();
                     return savedOrder;
                 } catch (Exception e) {
@@ -161,7 +162,7 @@ class OrderConcurrencyTest {
                             .quantity((long) quantityPerOrder)
                             .build();
 
-                    Order savedOrder = orderService.createOrder(order, List.of(orderProduct));
+                    Order savedOrder = orderService.placeOrder(order, List.of(orderProduct));
                     successCount.incrementAndGet();
                     return savedOrder;
                 } catch (Exception e) {
@@ -219,7 +220,7 @@ class OrderConcurrencyTest {
                             .quantity((long) quantityPerOrder)
                             .build();
 
-                    Order savedOrder = orderService.createOrder(order, List.of(orderProduct));
+                    Order savedOrder = orderService.placeOrder(order, List.of(orderProduct));
                     successCount.incrementAndGet();
                     return savedOrder;
                 } catch (Exception e) {

@@ -55,7 +55,7 @@ class OrderControllerTest {
                 .userId(userId)
                 .build();
 
-        given(orderService.createOrder(any(), any())).willReturn(savedOrder);
+        given(orderService.placeOrder(any(), any())).willReturn(savedOrder);
 
         // when & then
         mockMvc.perform(post("/api/v1/orders")

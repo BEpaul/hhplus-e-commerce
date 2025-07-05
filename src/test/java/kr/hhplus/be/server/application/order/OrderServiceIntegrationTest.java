@@ -8,7 +8,7 @@ import kr.hhplus.be.server.domain.order.OrderRepository;
 import kr.hhplus.be.server.domain.order.OrderStatus;
 import kr.hhplus.be.server.domain.point.Point;
 import kr.hhplus.be.server.domain.product.Product;
-import kr.hhplus.be.server.infrastructure.external.DataPlatform;
+import kr.hhplus.be.server.infrastructure.external.payment.DataPlatform;
 import kr.hhplus.be.server.infrastructure.persistence.point.PointRepository;
 import kr.hhplus.be.server.infrastructure.persistence.product.ProductRepository;
 import org.junit.jupiter.api.BeforeEach;
@@ -70,6 +70,7 @@ class OrderServiceIntegrationTest {
                 .name("테스트 상품")
                 .price(10000L)
                 .stock(10L)
+                .salesCount(0L)
                 .description("테스트 상품 설명")
                 .build();
         productId = productRepository.save(product).getId();
@@ -120,7 +121,7 @@ class OrderServiceIntegrationTest {
                     .build();
 
             // when
-            Order savedOrder = orderService.createOrder(order, List.of(orderProduct));
+            Order savedOrder = orderService.placeOrder(order, List.of(orderProduct));
 
             // then
             assertThat(savedOrder.getId()).isNotNull();
@@ -137,7 +138,7 @@ class OrderServiceIntegrationTest {
                     .build();
 
             // when & then
-            assertThatThrownBy(() -> orderService.createOrder(order, List.of()))
+            assertThatThrownBy(() -> orderService.placeOrder(order, List.of()))
                     .isInstanceOf(ApiException.class)
                     .hasMessage(ORDER_PRODUCT_EMPTY.getMessage());
         }
@@ -157,7 +158,7 @@ class OrderServiceIntegrationTest {
             given(dataPlatform.sendData(any())).willReturn(false);
 
             // when & then
-            assertThatThrownBy(() -> orderService.createOrder(order, List.of(orderProduct)))
+            assertThatThrownBy(() -> orderService.placeOrder(order, List.of(orderProduct)))
                     .isInstanceOf(ApiException.class)
                     .hasMessage(PAYMENT_FAILED.getMessage());
             assertThat(order.getStatus()).isEqualTo(OrderStatus.FAILED);

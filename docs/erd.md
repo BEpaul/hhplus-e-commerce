@@ -274,7 +274,8 @@ CREATE TABLE `point_history` (
 CREATE TABLE `bestseller` (
     `bestseller_id` BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
     `name` VARCHAR(50) NOT NULL,
-    `price_id` BIGINT NOT NULL,
+    `price` BIGINT NOT NULL,
+    `product_id` BIGINT UNSIGNED NOT NULL,
     `ranking` TINYINT NOT NULL,
     `top_date` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     `created_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,

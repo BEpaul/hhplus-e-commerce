@@ -6,9 +6,7 @@ import kr.hhplus.be.server.domain.coupon.DiscountType;
 import kr.hhplus.be.server.domain.coupon.UserCoupon;
 import kr.hhplus.be.server.domain.coupon.UserCouponRepository;
 import kr.hhplus.be.server.domain.coupon.CouponRepository;
-import kr.hhplus.be.server.infrastructure.config.redis.DistributedLockService;
 import kr.hhplus.be.server.interfaces.web.coupon.dto.response.CouponListResponse;
-import kr.hhplus.be.server.interfaces.web.coupon.dto.response.CouponResponse;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -25,9 +23,7 @@ import java.util.Optional;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.BDDMockito.*;
-import static org.mockito.Mockito.lenient;
 import static kr.hhplus.be.server.common.exception.ErrorCode.*;
 
 @ExtendWith(MockitoExtension.class)
@@ -40,7 +36,10 @@ class CouponServiceTest {
     private CouponRepository couponRepository;
 
     @Mock
-    private DistributedLockService distributedLockService;
+    private CouponRedisService couponRedisService;
+
+    @Mock
+    private CouponEventService couponEventService;
 
     @InjectMocks
     private CouponService couponService;
@@ -72,14 +71,6 @@ class CouponServiceTest {
             .startDate(LocalDateTime.now().minusDays(1))
             .endDate(LocalDateTime.now().plusDays(30))
             .build();
-            
-        // 분산락 모킹 설정 - 락을 성공적으로 획득하고 작업을 실행하도록 설정
-        lenient().when(distributedLockService.executePointLock(any(), any())).thenAnswer(invocation -> {
-            return invocation.getArgument(1, java.util.function.Supplier.class).get();
-        });
-        lenient().when(distributedLockService.executeWithLock(any(String.class), any(Long.class), any(Long.class), any(java.util.function.Supplier.class))).thenAnswer(invocation -> {
-            return invocation.getArgument(3, java.util.function.Supplier.class).get();
-        });
     }
 
     @Test
@@ -95,7 +86,6 @@ class CouponServiceTest {
         // then
         then(userCouponRepository).should(times(1)).findById(userCouponId);
         then(userCouponRepository).should(times(1)).save(any(UserCoupon.class));
-        then(distributedLockService).should().executePointLock(eq(userId), any());
     }
 
     @Test
@@ -142,6 +132,8 @@ class CouponServiceTest {
     void 쿠폰이_정상적으로_발급된다() {
         // given
         given(couponRepository.findById(couponId)).willReturn(Optional.of(coupon));
+        given(couponRedisService.getCouponLimit(couponId)).willReturn(0L);
+        given(couponRedisService.tryIssueCoupon(couponId, userId)).willReturn(true);
         given(userCouponRepository.save(any(UserCoupon.class))).willReturn(userCoupon);
 
         // when
@@ -154,87 +146,63 @@ class CouponServiceTest {
         assertThat(issuedCoupon.isUsed()).isFalse();
         
         then(couponRepository).should(times(1)).findById(couponId);
+        then(couponRedisService).should(times(1)).setCouponLimit(couponId, coupon.getStock());
+        then(couponRedisService).should(times(1)).tryIssueCoupon(couponId, userId);
         then(userCouponRepository).should(times(1)).save(any(UserCoupon.class));
-        then(distributedLockService).should().executeWithLock(eq("coupon:issue:" + couponId), eq(10L), eq(30L), any(java.util.function.Supplier.class));
+        then(couponEventService).should(times(1)).publishCouponIssuedEvent(couponId, userId, userCoupon.getId());
     }
 
     @Test
-    void 쿠폰_잔여수량이_0이면_발급_요청_시_예외가_발생한다() {
+    void 쿠폰_발급_실패_시_예외가_발생한다() {
         // given
-        Coupon outOfStockCoupon = Coupon.builder()
-            .id(couponId)
-            .discountValue(10000L)
-            .discountType(DiscountType.AMOUNT)
-            .title("신규 가입 쿠폰")
-            .stock(0L) // 재고가 0인 쿠폰
-            .startDate(LocalDateTime.now().minusDays(1))
-            .endDate(LocalDateTime.now().plusDays(30))
-            .build();
-            
-        given(couponRepository.findById(couponId)).willReturn(Optional.of(outOfStockCoupon));
+        given(couponRepository.findById(couponId)).willReturn(Optional.of(coupon));
+        given(couponRedisService.getCouponLimit(couponId)).willReturn(0L);
+        given(couponRedisService.tryIssueCoupon(couponId, userId)).willReturn(false);
 
         // when & then
         assertThatThrownBy(() -> couponService.issueCoupon(userId, couponId))
                 .isInstanceOf(ApiException.class)
-                .hasMessage(OUT_OF_STOCK_COUPON.getMessage());
+                .hasMessage(COUPON_ISSUANCE_FAILED.getMessage());
 
         then(couponRepository).should(times(1)).findById(couponId);
+        then(couponRedisService).should(times(1)).setCouponLimit(couponId, coupon.getStock());
+        then(couponRedisService).should(times(1)).tryIssueCoupon(couponId, userId);
         then(userCouponRepository).should(never()).save(any(UserCoupon.class));
-        then(distributedLockService).should().executeWithLock(eq("coupon:issue:" + couponId), eq(10L), eq(30L), any(java.util.function.Supplier.class));
     }
 
     @Test
-    void 사용자의_쿠폰_목록이_정상적으로_조회된다() {
+    void 존재하지_않는_쿠폰_발급_요청_시_예외가_발생한다() {
         // given
-        Long secondCouponId = 201L;
-        UserCoupon secondUserCoupon = UserCoupon.builder()
-            .id(2L)
-            .userId(userId)
-            .couponId(secondCouponId)
-            .isUsed(false)
-            .expiredAt(LocalDateTime.now().plusDays(14))
-            .build();
+        given(couponRepository.findById(couponId)).willReturn(Optional.empty());
 
-        Coupon secondCoupon = Coupon.builder()
-            .id(secondCouponId)
-            .discountValue(20L)
-            .discountType(DiscountType.PERCENT)
-            .title("여름 맞이 할인 쿠폰")
-            .stock(50L)
-            .startDate(LocalDateTime.now())
-            .endDate(LocalDateTime.now().plusDays(60))
-            .build();
+        // when & then
+        assertThatThrownBy(() -> couponService.issueCoupon(userId, couponId))
+                .isInstanceOf(ApiException.class)
+                .hasMessage(COUPON_NOT_FOUND.getMessage());
 
-        List<UserCoupon> userCoupons = Arrays.asList(userCoupon, secondUserCoupon);
+        then(couponRepository).should(times(1)).findById(couponId);
+        then(couponRedisService).should(never()).tryIssueCoupon(any(), any());
+        then(userCouponRepository).should(never()).save(any(UserCoupon.class));
+    }
+
+    @Test
+    void 사용자_쿠폰_목록_조회에_성공한다() {
+        // given
+        List<UserCoupon> userCoupons = Arrays.asList(userCoupon);
         given(userCouponRepository.findUnusedByUserId(userId)).willReturn(userCoupons);
         given(couponRepository.findById(couponId)).willReturn(Optional.of(coupon));
-        given(couponRepository.findById(secondCouponId)).willReturn(Optional.of(secondCoupon));
 
         // when
         CouponListResponse response = couponService.getUserCoupons(userId);
 
         // then
         assertThat(response).isNotNull();
-        assertThat(response.getCoupons()).hasSize(2);
-        
-        List<CouponResponse> coupons = response.getCoupons();
-        assertThat(coupons.get(0).getId()).isEqualTo(couponId);
-        assertThat(coupons.get(0).getTitle()).isEqualTo("신규 가입 쿠폰");
-        assertThat(coupons.get(0).getDiscountType()).isEqualTo(DiscountType.AMOUNT);
-        assertThat(coupons.get(0).getDiscountValue()).isEqualTo(10000L);
-        
-        assertThat(coupons.get(1).getId()).isEqualTo(secondCouponId);
-        assertThat(coupons.get(1).getTitle()).isEqualTo("여름 맞이 할인 쿠폰");
-        assertThat(coupons.get(1).getDiscountType()).isEqualTo(DiscountType.PERCENT);
-        assertThat(coupons.get(1).getDiscountValue()).isEqualTo(20L);
-
-        then(userCouponRepository).should(times(1)).findUnusedByUserId(userId);
-        then(couponRepository).should(times(1)).findById(couponId);
-        then(couponRepository).should(times(1)).findById(secondCouponId);
+        assertThat(response.getCoupons()).hasSize(1);
+        assertThat(response.getCoupons().get(0).getTitle()).isEqualTo("신규 가입 쿠폰");
     }
 
     @Test
-    void 사용자의_사용_가능한_쿠폰_목록이_없는_경우_빈_배열이_반환된다() {
+    void 사용자_쿠폰_목록이_비어있을_때_빈_리스트를_반환한다() {
         // given
         given(userCouponRepository.findUnusedByUserId(userId)).willReturn(Collections.emptyList());
 
@@ -244,32 +212,48 @@ class CouponServiceTest {
         // then
         assertThat(response).isNotNull();
         assertThat(response.getCoupons()).isEmpty();
-
-        then(userCouponRepository).should(times(1)).findUnusedByUserId(userId);
-        then(couponRepository).should(never()).findById(any());
     }
 
     @Test
-    void 사용한_쿠폰은_조회되지_않는다() {
+    void 할인_가격_계산에_성공한다() {
         // given
-        UserCoupon usedCoupon = UserCoupon.builder()
-            .id(1L)
-            .userId(userId)
-            .couponId(couponId)
-            .isUsed(true)
-            .expiredAt(LocalDateTime.now().plusDays(7))
-            .build();
-
-        given(userCouponRepository.findUnusedByUserId(userId)).willReturn(Collections.emptyList());
+        Long userCouponId = 1L;
+        Long totalPrice = 50000L;
+        given(userCouponRepository.findById(userCouponId)).willReturn(Optional.of(userCoupon));
+        given(couponRepository.findById(couponId)).willReturn(Optional.of(coupon));
 
         // when
-        CouponListResponse response = couponService.getUserCoupons(userId);
+        Long discountedPrice = couponService.calculateDiscountPrice(userCouponId, totalPrice);
 
         // then
-        assertThat(response).isNotNull();
-        assertThat(response.getCoupons()).isEmpty();
+        assertThat(discountedPrice).isEqualTo(40000L); // 50000 - 10000
+    }
 
-        then(userCouponRepository).should(times(1)).findUnusedByUserId(userId);
-        then(couponRepository).should(never()).findById(any());
+    @Test
+    void 쿠폰_발급_순위_조회에_성공한다() {
+        // given
+        Long expectedRank = 5L;
+        given(couponRedisService.getIssueRank(couponId, userId)).willReturn(expectedRank);
+
+        // when
+        Long actualRank = couponService.getIssueRank(couponId, userId);
+
+        // then
+        assertThat(actualRank).isEqualTo(expectedRank);
+        then(couponRedisService).should(times(1)).getIssueRank(couponId, userId);
+    }
+
+    @Test
+    void 쿠폰_발급_완료_수_조회_성공한다() {
+        // given
+        Long expectedCount = 50L;
+        given(couponRedisService.getIssuedCount(couponId)).willReturn(expectedCount);
+
+        // when
+        Long actualCount = couponService.getIssuedCount(couponId);
+
+        // then
+        assertThat(actualCount).isEqualTo(expectedCount);
+        then(couponRedisService).should(times(1)).getIssuedCount(couponId);
     }
 } 

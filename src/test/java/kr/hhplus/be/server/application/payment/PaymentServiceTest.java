@@ -7,7 +7,7 @@ import kr.hhplus.be.server.domain.payment.PaymentMethod;
 import kr.hhplus.be.server.domain.payment.PaymentRepository;
 import kr.hhplus.be.server.domain.payment.PaymentStatus;
 import kr.hhplus.be.server.domain.point.Point;
-import kr.hhplus.be.server.infrastructure.external.DataPlatform;
+import kr.hhplus.be.server.infrastructure.external.payment.DataPlatform;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;

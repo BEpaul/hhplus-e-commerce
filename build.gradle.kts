@@ -40,7 +40,6 @@ dependencies {
 	implementation("org.springdoc:springdoc-openapi-starter-webmvc-ui:2.8.6")
 	implementation("org.springframework.boot:spring-boot-starter-validation")
 	implementation ("org.springframework.boot:spring-boot-starter-aop")
-	implementation ("org.springframework.retry:spring-retry")
 
 	// Redisson
 	implementation("org.redisson:redisson-spring-boot-starter:3.27.0")

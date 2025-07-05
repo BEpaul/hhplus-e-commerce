@@ -27,6 +27,7 @@ public enum ErrorCode {
     ALREADY_USED_COUPON("ALREADY_USED_COUPON", HttpStatus.CONFLICT, "이미 사용된 쿠폰입니다."),
     ALREADY_APPLIED_COUPON("ALREADY_APPLIED_COUPON", HttpStatus.CONFLICT, "이미 적용된 쿠폰입니다."),
     NOT_OWNED_USER_COUPON("NOT_OWNED_USER_COUPON", HttpStatus.CONFLICT, "소유하지 않은 쿠폰입니다."),
+    COUPON_ALREADY_ISSUED("COUPON_ALREADY_ISSUED", HttpStatus.CONFLICT, "이미 발급된 쿠폰입니다."),
     
     // 422 Unprocessable Entity - 비즈니스 로직 오류
     EXCEEDS_MAXIMUM_POINT("EXCEEDS_MAXIMUM_POINT", HttpStatus.UNPROCESSABLE_ENTITY, "충전 후 포인트가 300만을 초과할 수 없습니다."),
@@ -34,10 +35,11 @@ public enum ErrorCode {
     OUT_OF_STOCK_PRODUCT("OUT_OF_STOCK_PRODUCT", HttpStatus.UNPROCESSABLE_ENTITY, "상품 재고가 부족합니다."),
     OUT_OF_STOCK_COUPON("OUT_OF_STOCK_COUPON", HttpStatus.UNPROCESSABLE_ENTITY, "쿠폰 재고가 부족합니다."),
     EXPIRED_COUPON("EXPIRED_COUPON", HttpStatus.UNPROCESSABLE_ENTITY, "쿠폰이 만료되었습니다."),
-    
+
     // 500 Internal Server Error - 서버 내부 오류
     PAYMENT_PROCESSING_FAILED("PAYMENT_PROCESSING_FAILED", HttpStatus.INTERNAL_SERVER_ERROR, "결제 처리 중 예기치 못한 오류가 발생했습니다."),
     PAYMENT_FAILED("PAYMENT_FAILED", HttpStatus.INTERNAL_SERVER_ERROR, "결제에 실패했습니다."),
+    COUPON_ISSUANCE_FAILED("COUPON_ISSUANCE_FAILED", HttpStatus.INTERNAL_SERVER_ERROR, "쿠폰 발급에 실패했습니다."),
 
     // 기타 예상치 못한 오류
     INTERNAL_SERVER_ERROR("INTERNAL_SERVER_ERROR", HttpStatus.INTERNAL_SERVER_ERROR, "서버 내부 오류가 발생했습니다."),

@@ -43,6 +43,7 @@ class ProductControllerIntegrationTest {
                 .name("테스트 상품")
                 .price(10000L)
                 .stock(50L)
+                .salesCount(0L)
                 .description("테스트 상품의 상세 설명입니다.")
                 .build();
         savedProduct = productRepository.save(product);
@@ -69,6 +70,7 @@ class ProductControllerIntegrationTest {
                 .name("테스트 상품 2")
                 .price(20000L)
                 .stock(30L)
+                .salesCount(0L)
                 .description("테스트 상품 2의 상세 설명입니다.")
                 .build();
         productRepository.save(product2);
