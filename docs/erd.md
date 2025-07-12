@@ -14,8 +14,6 @@ erDiagram
     orders ||--o{ payment : paid_by
     user_coupon ||--o{ orders : applied_to
 
-    product ||--o{ bestseller : appears_in
-
     user {
         BIGINT user_id PK
         VARCHAR nickname
@@ -61,6 +59,7 @@ erDiagram
         VARCHAR name
         BIGINT price
         BIGINT stock
+        BIGINT sales_count
         VARCHAR description
         DATETIME created_at
         DATETIME updated_at
@@ -106,19 +105,19 @@ erDiagram
         DATETIME updated_at
     }
 
-    bestseller {
-        BIGINT bestseller_id PK
-        BIGINT product_id FK
-        VARCHAR name
-        TINYINT ranking
-        DATETIME top_date
+    coupon_outbox_event {
+        BIGINT id PK
+        VARCHAR event_type
+        TEXT payload
+        VARCHAR status
+        BIGINT retry_count
         DATETIME created_at
         DATETIME updated_at
     }
 ```
 
-- 상위 상품(Bestseller)는 초기에는 RDBMS 사용, 이후 Redis로 대체한다. (자주 조회되므로 캐싱 활용)
 - 결제는 외부 플랫폼 이용을 가정한다.
+- 상위 상품 조회의 경우 Redis Sorted Set 자료구조를 활용한다.
 
 ## 상태 정의
 
@@ -130,15 +129,9 @@ erDiagram
 - `AMOUNT`: 금액 할인
 - `PERCENT`: 비율 할인
 
-
-### 💡 상위 상품 순위
-- `ranking`: 상위 상품 순위 (1~5)
-
-
 ### 💡 포인트 이력 타입
 - `CHARGE`: 잔액 충전
 - `USE`: 잔액 사용
-
 
 ### 💡 주문 상태
 - `COMPLETED`: 주문 완료
@@ -158,6 +151,11 @@ erDiagram
 - `PENDING`: 결제 대기
 - `CANCELED`: 결제 취소
 - `REFUNDED`: 결제 환불
+
+### 💡 Outbox 이벤트 상태
+- `PENDING`: 처리 대기
+- `PROCESSED`: 처리 완료
+- `FAILED`: 처리 실패
 
 ### 테이블 생성 쿼리
 ```sql
@@ -216,6 +214,7 @@ CREATE TABLE `product` (
     `name` VARCHAR(50) NOT NULL,
     `price` BIGINT NOT NULL,
     `stock` BIGINT NOT NULL,
+    `sales_count` BIGINT NOT NULL DEFAULT 0,
     `description` VARCHAR(300) NOT NULL,
     `created_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     `updated_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
@@ -270,18 +269,18 @@ CREATE TABLE `point_history` (
     PRIMARY KEY (`point_history_id`)
 );
 
--- 베스트셀러
-CREATE TABLE `bestseller` (
-    `bestseller_id` BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
-    `name` VARCHAR(50) NOT NULL,
-    `price` BIGINT NOT NULL,
-    `product_id` BIGINT UNSIGNED NOT NULL,
-    `ranking` TINYINT NOT NULL,
-    `top_date` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+-- 쿠폰 Outbox
+CREATE TABLE coupon_outbox_event (
+    `id` BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+    `event_type` VARCHAR(255) NOT NULL,
+    `payload` TEXT NOT NULL,
+    `status` VARCHAR(50) NOT NULL,
+    `retry_count` BIGINT DEFAULT 0,
     `created_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     `updated_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-    PRIMARY KEY (`bestseller_id`)
+    PRIMARY KEY (`id`)
 );
+
 
 -- 외래 키 제약 조건 추가
 -- orders
@@ -316,9 +315,5 @@ ADD CONSTRAINT `FK_user_coupon_user` FOREIGN KEY (`user_id`) REFERENCES `user`(`
 
 ALTER TABLE `user_coupon`
 ADD CONSTRAINT `FK_user_coupon_coupon` FOREIGN KEY (`coupon_id`) REFERENCES `coupon`(`coupon_id`);
-
--- bestseller
-ALTER TABLE `bestseller`
-ADD CONSTRAINT `FK_bestseller_product` FOREIGN KEY (`product_id`) REFERENCES `product`(`product_id`);
 
 ```

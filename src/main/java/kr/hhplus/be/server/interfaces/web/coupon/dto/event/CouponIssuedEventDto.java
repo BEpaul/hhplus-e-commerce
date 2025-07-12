@@ -1,4 +1,4 @@
-package kr.hhplus.be.server.interfaces.web.coupon.dto;
+package kr.hhplus.be.server.interfaces.web.coupon.dto.event;
 
 import com.fasterxml.jackson.annotation.JsonFormat;
 import lombok.AllArgsConstructor;

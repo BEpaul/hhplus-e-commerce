@@ -27,7 +27,6 @@ public class ProductService {
     public Product getProduct(Long productId) {
         return productRepository.findById(productId)
                 .orElseThrow(() -> new ApiException(PRODUCT_NOT_FOUND));
-
     }
 
     /**

@@ -51,7 +51,7 @@ public class Order {
         this.status = OrderStatus.COMPLETED;
     }
 
-    public void fail() {
+    public void markAsFailed() {
         this.status = OrderStatus.FAILED;
     }
 }

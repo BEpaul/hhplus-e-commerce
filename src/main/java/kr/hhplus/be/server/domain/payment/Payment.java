@@ -1,12 +1,15 @@
 package kr.hhplus.be.server.domain.payment;
 
 import jakarta.persistence.*;
+import kr.hhplus.be.server.common.exception.ApiException;
 import lombok.AccessLevel;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Builder;
 
 import java.time.LocalDateTime;
+
+import static kr.hhplus.be.server.common.exception.ErrorCode.*;
 
 @Entity
 @Getter
@@ -40,31 +43,31 @@ public class Payment {
         this.status = status;
     }
 
-    public static Payment create(Long orderId, PaymentMethod method, Long amount) {
+    public static Payment create(Long orderId, String idempotencyKey, PaymentMethod method, Long amount) {
+        if (orderId == null) {
+            throw new ApiException(PAYMENT_INFO_NOT_EXIST);
+        }
+
         return Payment.builder()
                 .orderId(orderId)
-                .idempotencyKey(generateIdempotencyKey(orderId))
+                .idempotencyKey(idempotencyKey)
                 .amount(amount)
                 .paymentMethod(method)
                 .status(PaymentStatus.PENDING)
                 .build();
     }
 
-    private static String generateIdempotencyKey(Long orderId) {
-        return String.format("ORDER_%d_%d", orderId, System.currentTimeMillis());
-    }
-
-    public void approve() {
+    public void markAsApproved() {
         this.status = PaymentStatus.APPROVED;
         this.approvedAt = LocalDateTime.now();
     }
 
-    public void cancel() {
+    public void markAsCanceled() {
         this.status = PaymentStatus.CANCELED;
         this.canceledAt = LocalDateTime.now();
     }
 
-    public void pending() {
+    public void markAsPending() {
         this.status = PaymentStatus.PENDING;
     }
 } 

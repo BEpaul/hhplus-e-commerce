@@ -433,6 +433,89 @@
 ```
 </details>
 
+### ✅ 쿠폰 발급 상태 조회
+사용자의 쿠폰 발급 순위와 상태를 조회한다.
+
+- Method: `GET`
+- Endpoint: `/api/v1/coupons/{couponId}/status`
+
+<details markdown="1">
+<summary>상세 보기</summary>
+
+### **Request**
+**Path parameters**
+
+| Field     | Type   | Description | Constraints |
+|-----------|--------|-------------|-------------|
+| couponId  | Number | 쿠폰 ID      | 양의 정수   |
+
+**Query parameters**
+
+| Field  | Type   | Description | Constraints |
+|--------|--------|-------------|-------------|
+| userId  | Number | 사용자 ID      | 양의 정수   |
+
+### **Response**
+
+| Field                    | Type   | Description                        |
+|--------------------------|--------|------------------------------------|
+| code                     | Number | 응답 코드                              |
+| message                  | String | 응답 메시지                             |
+| data.couponId            | Number | 쿠폰 ID                              |
+| data.userId              | Number | 사용자 ID                              |
+| data.issueRank           | Number | 발급 순위 (발급되지 않은 경우 null)        |
+| data.issuedCount         | Number | 현재까지 발급된 쿠폰 수                    |
+| data.totalLimit          | Number | 쿠폰 총 발급 제한 수                     |
+| data.isIssued            | Boolean | 쿠폰 발급 여부 (true: 발급됨, false: 미발급) |
+
+**성공 응답 예시:**
+```json
+{
+  "code": 200,
+  "message": "쿠폰 발급 상태 조회 성공",
+  "data": {
+    "couponId": 1,
+    "userId": 123,
+    "issueRank": 45,
+    "issuedCount": 100,
+    "totalLimit": 1000,
+    "isIssued": true
+  }
+}
+```
+
+**미발급 사용자 응답 예시:**
+```json
+{
+  "code": 200,
+  "message": "쿠폰 발급 상태 조회 성공",
+  "data": {
+    "couponId": 1,
+    "userId": 456,
+    "issueRank": null,
+    "issuedCount": 100,
+    "totalLimit": 1000,
+    "isIssued": false
+  }
+}
+```
+
+**에러 응답 예시:**
+```json
+{
+  "code": "COUPON_NOT_FOUND",
+  "message": "쿠폰을 찾을 수 없습니다."
+}
+```
+
+```json
+{
+  "code": "USER_NOT_FOUND",
+  "message": "사용자를 찾을 수 없습니다."
+}
+```
+</details>
+
 ### ✅ 쿠폰 발급
 사용자가 선착순으로 쿠폰을 발급받는다.
 
@@ -491,18 +574,12 @@
 }
 ```
 
-```json
-{
-  "code": "ALREADY_APPLIED_COUPON",
-  "message": "이미 적용된 쿠폰입니다."
-}
-```
 </details>
 
 
 ## 5️⃣ 상위 상품 (Bestseller)
 ### ✅ 상위 상품 목록 조회
-판매량이 가장 높은 상품 목록을 조회한다.
+실시간 판매량 TOP5 상품 목록을 조회한다.
 
 - Method: `GET`
 - Endpoint: `/api/v1/bestsellers`
@@ -516,36 +593,50 @@
 |----------------------------|--------|-------------------|
 | code                       | Number | 응답 코드  |
 | message                    | String | 응답 메시지 |
-| data.bestsellers           | Array  | 상위 상품 목록 |
-| data.bestsellers[].id      | Number | 상품 ID |
-| data.bestsellers[].name    | String | 상품 이름 |
-| data.bestsellers[].price   | Number | 상품 가격 |
-| data.bestsellers[].stock   | Number | 상품 잔여 수량 |
-| data.bestsellers[].ranking | Number | 상위 상품 순위 (1~5) |
+| data                       | Array  | 상위 상품 목록 |
+| data[].productId           | Number | 상품 ID |
+| data[].name                | String | 상품 이름 |
+| data[].price               | Number | 상품 가격 |
+| data[].ranking             | Number | 상위 상품 순위 (1~5) |
+| data[].salesCount          | Number | 오늘 판매량 |
 
 **성공 응답 예시:**
 ```json
 {
   "code": 200,
   "message": "상위 상품 목록 조회 성공",
-  "data": {
-    "bestsellers": [
-      {
-        "id": 1,
-        "name": "상품 A",
-        "price": 10000,
-        "stock": 50,
-        "ranking": 1
-      },
-      {
-        "id": 2,
-        "name": "상품 B",
-        "price": 20000,
-        "stock": 30,
-        "ranking": 2
-      }
-    ]
-  }
+  "data": [
+    {
+      "productId": 1,
+      "name": "새우깡",
+      "price": 5000,
+      "ranking": 1,
+      "salesCount": 150
+    },
+    {
+      "productId": 2,
+      "name": "메론킥",
+      "price": 7000,
+      "ranking": 2,
+      "salesCount": 120
+    },
+    {
+      "productId": 3,
+      "name": "고무장갑",
+      "price": 50000,
+      "ranking": 3,
+      "salesCount": 80
+    }
+  ]
+}
+```
+
+**데이터가 없는 경우 응답 예시:**
+```json
+{
+  "code": 200,
+  "message": "베스트셀러 데이터가 없습니다",
+  "data": []
 }
 ```
 

@@ -6,9 +6,10 @@ import kr.hhplus.be.server.domain.order.Order;
 import kr.hhplus.be.server.domain.order.OrderProduct;
 import kr.hhplus.be.server.domain.order.OrderRepository;
 import kr.hhplus.be.server.domain.order.OrderStatus;
+import kr.hhplus.be.server.domain.order.event.OrderEventPublisher;
 import kr.hhplus.be.server.domain.point.Point;
 import kr.hhplus.be.server.domain.product.Product;
-import kr.hhplus.be.server.infrastructure.external.payment.DataPlatform;
+import kr.hhplus.be.server.infrastructure.external.orderinfo.DataPlatform;
 import kr.hhplus.be.server.infrastructure.persistence.point.PointRepository;
 import kr.hhplus.be.server.infrastructure.persistence.product.ProductRepository;
 import org.junit.jupiter.api.BeforeEach;
@@ -25,8 +26,6 @@ import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
-import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.BDDMockito.given;
 import static kr.hhplus.be.server.common.exception.ErrorCode.*;
 
 @SpringBootTest
@@ -54,6 +53,9 @@ class OrderServiceIntegrationTest {
 
     @MockitoBean
     private DataPlatform dataPlatform;
+
+    @MockitoBean
+    private OrderEventPublisher orderEventPublisher;
 
     private Long userId = 1L;
     private Long productId;
@@ -99,9 +101,6 @@ class OrderServiceIntegrationTest {
                 .expiredAt(LocalDateTime.now().plusDays(30))
                 .build();
         userCouponId = userCouponRepository.save(userCoupon).getId();
-
-        // 외부 결제 플랫폼 모킹
-        given(dataPlatform.sendData(any())).willReturn(true);
     }
 
     @Nested
@@ -141,27 +140,6 @@ class OrderServiceIntegrationTest {
             assertThatThrownBy(() -> orderService.placeOrder(order, List.of()))
                     .isInstanceOf(ApiException.class)
                     .hasMessage(ORDER_PRODUCT_EMPTY.getMessage());
-        }
-
-        @Test
-        void 결제가_실패하면_예외가_발생한다() {
-            // given
-            Order order = Order.builder()
-                    .userId(userId)
-                    .build();
-
-            OrderProduct orderProduct = OrderProduct.builder()
-                    .productId(productId)
-                    .quantity(2L)
-                    .build();
-
-            given(dataPlatform.sendData(any())).willReturn(false);
-
-            // when & then
-            assertThatThrownBy(() -> orderService.placeOrder(order, List.of(orderProduct)))
-                    .isInstanceOf(ApiException.class)
-                    .hasMessage(PAYMENT_FAILED.getMessage());
-            assertThat(order.getStatus()).isEqualTo(OrderStatus.FAILED);
         }
     }
 }

@@ -1,4 +1,4 @@
-package kr.hhplus.be.server.infrastructure.external.coupon;
+package kr.hhplus.be.server.domain.coupon.event;
 
 import jakarta.persistence.*;
 import kr.hhplus.be.server.common.config.BaseTimeEntity;
@@ -40,7 +40,7 @@ public class CouponOutBoxEvent extends BaseTimeEntity {
     }
 
     public void markAsProcessed() {
-        this.status = CouponOutBoxEventStatus.COMPLETED;
+        this.status = CouponOutBoxEventStatus.PROCESSED;
     }
 
     public void markAsFailed() {

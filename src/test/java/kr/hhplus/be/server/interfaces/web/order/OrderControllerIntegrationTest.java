@@ -5,9 +5,10 @@ import kr.hhplus.be.server.domain.coupon.*;
 import kr.hhplus.be.server.domain.coupon.CouponRepository;
 import kr.hhplus.be.server.domain.order.Order;
 import kr.hhplus.be.server.domain.order.OrderRepository;
+import kr.hhplus.be.server.domain.order.event.OrderEventPublisher;
 import kr.hhplus.be.server.domain.point.Point;
 import kr.hhplus.be.server.domain.product.Product;
-import kr.hhplus.be.server.infrastructure.external.payment.DataPlatform;
+import kr.hhplus.be.server.infrastructure.external.orderinfo.DataPlatform;
 import kr.hhplus.be.server.infrastructure.persistence.point.PointRepository;
 import kr.hhplus.be.server.infrastructure.persistence.product.ProductRepository;
 import kr.hhplus.be.server.interfaces.web.order.dto.request.OrderProductRequest;
@@ -27,8 +28,6 @@ import java.time.LocalDateTime;
 import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.BDDMockito.given;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -62,6 +61,9 @@ class OrderControllerIntegrationTest {
 
     @MockitoBean
     private DataPlatform dataPlatform;
+
+    @MockitoBean
+    private OrderEventPublisher orderEventPublisher;
 
     private Long userId = 1L;
     private Long productId;
@@ -107,9 +109,6 @@ class OrderControllerIntegrationTest {
                 .expiredAt(LocalDateTime.now().plusDays(30))
                 .build();
         userCouponId = userCouponRepository.save(userCoupon).getId();
-
-        // 외부 결제 플랫폼 모킹
-        given(dataPlatform.sendData(any())).willReturn(true);
     }
 
     @Test

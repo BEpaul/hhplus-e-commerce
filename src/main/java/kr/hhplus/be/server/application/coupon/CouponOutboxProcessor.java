@@ -2,11 +2,11 @@ package kr.hhplus.be.server.application.coupon;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import kr.hhplus.be.server.interfaces.web.coupon.dto.CouponIssuedEventDto;
+import kr.hhplus.be.server.interfaces.web.coupon.dto.event.CouponIssuedEventDto;
 import kr.hhplus.be.server.domain.coupon.Coupon;
 import kr.hhplus.be.server.domain.coupon.CouponRepository;
-import kr.hhplus.be.server.infrastructure.external.coupon.CouponOutBoxEvent;
-import kr.hhplus.be.server.infrastructure.external.coupon.CouponOutBoxEventRepository;
+import kr.hhplus.be.server.domain.coupon.event.CouponOutBoxEvent;
+import kr.hhplus.be.server.domain.coupon.event.CouponOutBoxEventRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.scheduling.annotation.Scheduled;
@@ -30,32 +30,14 @@ public class CouponOutboxProcessor {
      * 쿠폰 발급 이벤트 비동기 처리 (RDB 재고 동기화)
      */
     @Scheduled(fixedDelay = 10000) // 10초마다 실행
-    @Transactional
     public void processCouponIssuedEvents() {
         log.debug("쿠폰 발급 이벤트 비동기 처리 시작");
         
         try {
-            List<CouponOutBoxEvent> pendingEvents = outBoxEventRepository.findPendingEventsByType(COUPON_ISSUED_EVENT_TYPE);
+            List<CouponOutBoxEvent> pendingEvents = outBoxEventRepository.findPendingEventsByType(COUPON_ISSUED_EVENT_TYPE, 100);
             
             for (CouponOutBoxEvent event : pendingEvents) {
-                try {
-                    processCouponIssuedEvent(event);
-                    event.markAsProcessed();
-                    outBoxEventRepository.save(event);
-                    
-                    log.debug("쿠폰 발급 이벤트 처리 완료 - 이벤트 ID: {}", event.getId());
-                    
-                } catch (Exception e) {
-                    log.error("쿠폰 발급 이벤트 처리 실패 - 이벤트 ID: {}", event.getId(), e);
-                    
-                    if (event.canRetry()) {
-                        event.markAsFailed();
-                        outBoxEventRepository.save(event);
-                    } else {
-                        log.error("쿠폰 발급 이벤트 최대 재시도 횟수 초과 - 이벤트 ID: {}", event.getId());
-                        // TODO: 알림 발송 또는 수동 처리 필요
-                    }
-                }
+                processEventWithTransaction(event);
             }
             
         } catch (Exception e) {
@@ -67,7 +49,6 @@ public class CouponOutboxProcessor {
      * 실패한 이벤트 재처리 스케줄러
      */
     @Scheduled(fixedDelay = 60000) // 1분마다 실행
-    @Transactional
     public void retryFailedEvents() {
         log.debug("실패한 쿠폰 발급 이벤트 재처리 시작");
         
@@ -75,25 +56,36 @@ public class CouponOutboxProcessor {
             List<CouponOutBoxEvent> failedEvents = outBoxEventRepository.findFailedEventsForRetry();
             
             for (CouponOutBoxEvent event : failedEvents) {
-                try {
-                    processCouponIssuedEvent(event);
-                    event.markAsProcessed();
-                    outBoxEventRepository.save(event);
-                    
-                    log.info("실패한 쿠폰 발급 이벤트 재처리 완료 - 이벤트 ID: {}", event.getId());
-                    
-                } catch (Exception e) {
-                    log.error("실패한 쿠폰 발급 이벤트 재처리 실패 - 이벤트 ID: {}", event.getId(), e);
-                    
-                    if (event.canRetry()) {
-                        event.markAsFailed();
-                        outBoxEventRepository.save(event);
-                    }
-                }
+                processEventWithTransaction(event);
             }
             
         } catch (Exception e) {
             log.error("실패한 쿠폰 발급 이벤트 재처리 중 오류 발생", e);
+        }
+    }
+
+    /**
+     * 개별 이벤트를 트랜잭션으로 처리
+     */
+    @Transactional
+    public void processEventWithTransaction(CouponOutBoxEvent event) {
+        try {
+            processCouponIssuedEvent(event);
+            event.markAsProcessed();
+            outBoxEventRepository.save(event);
+            
+            log.debug("쿠폰 발급 이벤트 처리 완료 - 이벤트 ID: {}", event.getId());
+            
+        } catch (Exception e) {
+            log.error("쿠폰 발급 이벤트 처리 실패 - 이벤트 ID: {}", event.getId(), e);
+            
+            if (event.canRetry()) {
+                event.markAsFailed();
+                outBoxEventRepository.save(event);
+            } else {
+                log.error("쿠폰 발급 이벤트 최대 재시도 횟수 초과 - 이벤트 ID: {}", event.getId());
+                // TODO: 알림 발송 또는 수동 처리 필요
+            }
         }
     }
 

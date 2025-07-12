@@ -1,5 +1,6 @@
 package kr.hhplus.be.server.application.order;
 
+import kr.hhplus.be.server.application.bestseller.BestSellerRankingService;
 import kr.hhplus.be.server.application.coupon.CouponService;
 import kr.hhplus.be.server.application.payment.PaymentService;
 import kr.hhplus.be.server.application.product.ProductService;
@@ -9,6 +10,8 @@ import kr.hhplus.be.server.domain.order.OrderProduct;
 import kr.hhplus.be.server.domain.order.OrderProductRepository;
 import kr.hhplus.be.server.domain.order.OrderRepository;
 import kr.hhplus.be.server.domain.order.OrderStatus;
+import kr.hhplus.be.server.domain.order.event.OrderEventPublisher;
+import kr.hhplus.be.server.domain.payment.PaymentMethod;
 import kr.hhplus.be.server.domain.product.Product;
 import kr.hhplus.be.server.infrastructure.config.redis.DistributedLockService;
 import org.junit.jupiter.api.BeforeEach;
@@ -57,6 +60,12 @@ class OrderServiceTest {
     @Mock
     private DistributedLockService distributedLockService;
 
+    @Mock
+    private BestSellerRankingService bestSellerRankingService;
+
+    @Mock
+    private OrderEventPublisher orderEventPublisher;
+
     @Nested
     class Describe_createOrder {
 
@@ -67,6 +76,7 @@ class OrderServiceTest {
         @BeforeEach
         void setUp() {
             order = Order.builder()
+                .id(1L)
                 .userId(1L)
                 .userCouponId(null)
                 .build();
@@ -100,6 +110,10 @@ class OrderServiceTest {
             lenient().when(distributedLockService.executePaymentLock(any(), any())).thenAnswer(invocation -> {
                 return invocation.getArgument(1, java.util.function.Supplier.class).get();
             });
+            
+            lenient().doNothing().when(bestSellerRankingService).incrementTodaySales(any(), any());
+            
+            lenient().doNothing().when(orderEventPublisher).publishOrderCompletedEvent(any(), any());
         }
 
         @Test
@@ -112,7 +126,7 @@ class OrderServiceTest {
         @Test
         void 주문이_성공적으로_생성된다() {
             // given
-            doNothing().when(paymentService).processPayment(any(), eq(1L));
+            doNothing().when(paymentService).processPayment(eq(1L), eq(1L), eq(20000L), eq(PaymentMethod.POINT), any(String.class));
 
             // when
             Order result = orderService.placeOrder(order, orderProducts);
@@ -122,38 +136,43 @@ class OrderServiceTest {
             assertThat(result.getStatus()).isEqualTo(OrderStatus.COMPLETED);
             then(orderRepository).should().save(order);
             then(orderProductRepository).should().save(any(OrderProduct.class));
-            then(paymentService).should().processPayment(any(), eq(1L));
+            then(paymentService).should().processPayment(eq(1L), eq(1L), eq(20000L), eq(PaymentMethod.POINT), any(String.class));
             then(distributedLockService).should().executeOrderLock(eq(1L), any());
             then(distributedLockService).should().executeProductStockLock(eq(1L), any());
+            then(bestSellerRankingService).should().incrementTodaySales(eq(1L), eq(2L));
+            then(orderEventPublisher).should().publishOrderCompletedEvent(any(Order.class), eq(orderProducts));
         }
 
         @Test
         void 쿠폰이_적용된_주문이_성공적으로_생성된다() {
             // given
-            order = Order.builder()
+            Order couponOrder = Order.builder()
+                .id(1L)
                 .userId(1L)
                 .userCouponId(1L)
                 .build();
             given(couponService.calculateDiscountPrice(1L, 20000L)).willReturn(15000L);
-            doNothing().when(paymentService).processPayment(any(), eq(1L));
+            doNothing().when(paymentService).processPayment(eq(1L), eq(1L), eq(15000L), eq(PaymentMethod.POINT), any(String.class));
 
             // when
-            Order result = orderService.placeOrder(order, orderProducts);
+            Order result = orderService.placeOrder(couponOrder, orderProducts);
 
             // then
             assertThat(result).isNotNull();
             assertThat(result.getStatus()).isEqualTo(OrderStatus.COMPLETED);
             then(couponService).should().useCoupon(1L);
-            then(paymentService).should().processPayment(any(), eq(1L));
+            then(paymentService).should().processPayment(eq(1L), eq(1L), eq(15000L), eq(PaymentMethod.POINT), any(String.class));
             then(distributedLockService).should().executeOrderLock(eq(1L), any());
             then(distributedLockService).should().executeProductStockLock(eq(1L), any());
+            then(bestSellerRankingService).should().incrementTodaySales(eq(1L), eq(2L));
+            then(orderEventPublisher).should().publishOrderCompletedEvent(any(Order.class), eq(orderProducts));
         }
 
         @Test
         void 결제가_실패하면_예외가_발생한다() {
             // given
             doThrow(new ApiException(PAYMENT_FAILED))
-                .when(paymentService).processPayment(any(), eq(1L));
+                .when(paymentService).processPayment(eq(1L), eq(1L), eq(20000L), eq(PaymentMethod.POINT), any(String.class));
 
             // when & then
             assertThatThrownBy(() -> orderService.placeOrder(order, orderProducts))

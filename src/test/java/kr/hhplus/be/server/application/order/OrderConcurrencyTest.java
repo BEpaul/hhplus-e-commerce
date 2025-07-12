@@ -4,9 +4,10 @@ import kr.hhplus.be.server.domain.order.Order;
 import kr.hhplus.be.server.domain.order.OrderProduct;
 import kr.hhplus.be.server.domain.order.OrderRepository;
 import kr.hhplus.be.server.domain.order.OrderStatus;
+import kr.hhplus.be.server.domain.order.event.OrderEventPublisher;
 import kr.hhplus.be.server.domain.point.Point;
 import kr.hhplus.be.server.domain.product.Product;
-import kr.hhplus.be.server.infrastructure.external.payment.DataPlatform;
+import kr.hhplus.be.server.infrastructure.external.orderinfo.DataPlatform;
 import kr.hhplus.be.server.infrastructure.persistence.point.PointRepository;
 import kr.hhplus.be.server.infrastructure.persistence.product.ProductRepository;
 import org.junit.jupiter.api.BeforeEach;
@@ -25,8 +26,6 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.atomic.AtomicInteger;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.BDDMockito.given;
 
 @SpringBootTest
 @ActiveProfiles("test")
@@ -46,6 +45,9 @@ class OrderConcurrencyTest {
 
     @MockitoBean
     private DataPlatform dataPlatform;
+
+    @MockitoBean
+    private OrderEventPublisher orderEventPublisher;
 
     private Long userId = 1L;
     private Long productId;
@@ -76,9 +78,6 @@ class OrderConcurrencyTest {
                 .volume(1000000L)
                 .build();
         pointRepository.save(point);
-
-        // 외부 결제 플랫폼 모킹
-        given(dataPlatform.sendData(any())).willReturn(true);
     }
 
     @Test
