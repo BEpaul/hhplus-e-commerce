@@ -21,6 +21,7 @@ import java.util.List;
 
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.BDDMockito.given;
+import static org.mockito.BDDMockito.willDoNothing;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
@@ -39,18 +40,13 @@ class CouponControllerTest {
     private CouponService couponService;
 
     @Test
-    void 쿠폰을_발급한다() throws Exception {
+    void 쿠폰을_발급_요청한다() throws Exception {
         // given
         Long userId = 1L;
         Long couponId = 1L;
-        Long userCouponId = 1L;
         CouponIssueRequest request = new CouponIssueRequest(userId, couponId);
 
-        UserCoupon userCoupon = UserCoupon.builder()
-                .id(userCouponId)
-                .build();
-
-        given(couponService.issueCoupon(anyLong(), anyLong())).willReturn(userCoupon);
+        willDoNothing().given(couponService).issueCoupon(anyLong(), anyLong());
 
         // when & then
         mockMvc.perform(post("/api/v1/coupons")
@@ -58,8 +54,7 @@ class CouponControllerTest {
                         .content(objectMapper.writeValueAsString(request)))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.code").value(200))
-                .andExpect(jsonPath("$.data.couponId").value(userCouponId))
-                .andExpect(jsonPath("$.message").value("쿠폰 발급 성공"));
+                .andExpect(jsonPath("$.message").value("쿠폰 발급 요청 성공"));
     }
 
     @Test

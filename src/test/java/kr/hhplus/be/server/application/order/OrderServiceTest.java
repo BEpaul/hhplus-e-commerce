@@ -24,6 +24,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 
 import static kr.hhplus.be.server.common.exception.ErrorCode.*;
 import static org.assertj.core.api.Assertions.assertThat;
@@ -72,6 +73,7 @@ class OrderServiceTest {
         private Order order;
         private List<OrderProduct> orderProducts;
         private Product product;
+        private Map<Long, Product> productMap;
 
         @BeforeEach
         void setUp() {
@@ -88,6 +90,7 @@ class OrderServiceTest {
             orderProducts.add(orderProduct);
 
             product = Product.builder()
+                .id(1L)
                 .name("상품명")
                 .price(10000L)
                 .stock(10L)
@@ -95,9 +98,11 @@ class OrderServiceTest {
                 .description("상품 설명")
                 .build();
             
+            productMap = Map.of(1L, product);
+            
             // 기본 모킹 설정
-            lenient().when(productService.getProduct(1L)).thenReturn(product);
             lenient().when(productService.getProductWithPessimisticLock(1L)).thenReturn(product);
+            lenient().when(productService.getProductMapByIds(any())).thenReturn(productMap);
             lenient().when(orderRepository.save(any(Order.class))).thenReturn(order);
             
             // 분산락 모킹 설정 - 락을 성공적으로 획득하고 작업을 실행하도록 설정
@@ -113,7 +118,7 @@ class OrderServiceTest {
             
             lenient().doNothing().when(bestSellerRankingService).incrementTodaySales(any(), any());
             
-            lenient().doNothing().when(orderEventPublisher).publishOrderCompletedEvent(any(), any());
+            lenient().doNothing().when(orderEventPublisher).publishOrderCompletedEvent(any(), any(), any());
         }
 
         @Test
@@ -140,7 +145,7 @@ class OrderServiceTest {
             then(distributedLockService).should().executeOrderLock(eq(1L), any());
             then(distributedLockService).should().executeProductStockLock(eq(1L), any());
             then(bestSellerRankingService).should().incrementTodaySales(eq(1L), eq(2L));
-            then(orderEventPublisher).should().publishOrderCompletedEvent(any(Order.class), eq(orderProducts));
+            then(orderEventPublisher).should().publishOrderCompletedEvent(any(Order.class), eq(orderProducts), any());
         }
 
         @Test
@@ -165,7 +170,7 @@ class OrderServiceTest {
             then(distributedLockService).should().executeOrderLock(eq(1L), any());
             then(distributedLockService).should().executeProductStockLock(eq(1L), any());
             then(bestSellerRankingService).should().incrementTodaySales(eq(1L), eq(2L));
-            then(orderEventPublisher).should().publishOrderCompletedEvent(any(Order.class), eq(orderProducts));
+            then(orderEventPublisher).should().publishOrderCompletedEvent(any(Order.class), eq(orderProducts), any());
         }
 
         @Test

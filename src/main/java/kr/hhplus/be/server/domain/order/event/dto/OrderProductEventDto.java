@@ -1,4 +1,4 @@
-package kr.hhplus.be.server.interfaces.web.order.dto.event;
+package kr.hhplus.be.server.domain.order.event.dto;
 
 import lombok.AllArgsConstructor;
 import lombok.Builder;

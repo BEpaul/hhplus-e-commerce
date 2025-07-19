@@ -2,17 +2,20 @@ package kr.hhplus.be.server.domain.order.event;
 
 import kr.hhplus.be.server.domain.order.Order;
 import kr.hhplus.be.server.domain.order.OrderProduct;
+import kr.hhplus.be.server.domain.order.event.dto.OrderCompletedEventDto;
 import kr.hhplus.be.server.domain.product.Product;
-import kr.hhplus.be.server.infrastructure.external.orderinfo.DataPlatform;
+import kr.hhplus.be.server.infrastructure.external.orderinfo.OrderCompletedKafkaProducer;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.kafka.support.SendResult;
 
 import java.util.Arrays;
 import java.util.List;
+import java.util.concurrent.CompletableFuture;
 
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.*;
@@ -21,7 +24,7 @@ import static org.mockito.Mockito.*;
 class OrderCompletedEventListenerTest {
 
     @Mock
-    private DataPlatform dataPlatform;
+    private OrderCompletedKafkaProducer orderCompletedKafkaProducer;
 
     @InjectMocks
     private OrderCompletedEventListener listener;
@@ -63,38 +66,49 @@ class OrderCompletedEventListenerTest {
     }
 
     @Test
-    void 주문_완료_시_이벤트_처리에_성공한다() {
+    void 주문_완료_시_Kafka_메시지_발행에_성공한다() {
         // given
-        when(dataPlatform.sendOrderData(any())).thenReturn(true);
+        CompletableFuture<SendResult<String, OrderCompletedEventDto>> future = CompletableFuture.completedFuture(mock(SendResult.class));
+        when(orderCompletedKafkaProducer.publishOrderCompletedEvent(any())).thenReturn(future);
 
         // when
         listener.handleOrderCompletedEvent(event);
 
         // then
-        verify(dataPlatform, times(1)).sendOrderData(any());
+        verify(orderCompletedKafkaProducer, times(1)).publishOrderCompletedEvent(any());
     }
 
     @Test
-    void 주문_완료했지만_이벤트_처리에_실패하여_데이터_플랫폼_전송에_실패한다() {
+    void 주문_완료했지만_Kafka_메시지_발행에_실패한다() {
         // given
-        when(dataPlatform.sendOrderData(any())).thenReturn(false);
+        CompletableFuture<SendResult<String, OrderCompletedEventDto>> future = CompletableFuture.failedFuture(new RuntimeException("Kafka 오류"));
+        when(orderCompletedKafkaProducer.publishOrderCompletedEvent(any())).thenReturn(future);
 
         // when
         listener.handleOrderCompletedEvent(event);
 
         // then
-        verify(dataPlatform, times(1)).sendOrderData(any());
+        verify(orderCompletedKafkaProducer, times(1)).publishOrderCompletedEvent(any());
     }
 
     @Test
-    void 주문_완료_이벤트_처리에_실패하면_예외가_발생한다() {
+    void 주문_완료_이벤트_처리_중_예외가_발생한다() {
         // given
-        when(dataPlatform.sendOrderData(any())).thenThrow(new RuntimeException("데이터 플랫폼 오류"));
+        when(orderCompletedKafkaProducer.publishOrderCompletedEvent(any())).thenThrow(new RuntimeException("Kafka 연결 오류"));
 
         // when
         listener.handleOrderCompletedEvent(event);
 
         // then
-        verify(dataPlatform, times(1)).sendOrderData(any());
+        verify(orderCompletedKafkaProducer, times(1)).publishOrderCompletedEvent(any());
+    }
+
+    @Test
+    void 트랜잭션_롤백_시_이벤트_처리가_되지_않는다() {
+        // when
+        listener.handleOrderCompletedEventAfterRollback(event);
+
+        // then
+        verify(orderCompletedKafkaProducer, never()).publishOrderCompletedEvent(any());
     }
 } 

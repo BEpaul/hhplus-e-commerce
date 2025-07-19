@@ -1,4 +1,4 @@
-package kr.hhplus.be.server.interfaces.web.order.dto.event;
+package kr.hhplus.be.server.domain.order.event.dto;
 
 import com.fasterxml.jackson.annotation.JsonFormat;
 import kr.hhplus.be.server.domain.order.event.OrderCompletedEvent;

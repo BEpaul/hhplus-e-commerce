@@ -33,4 +33,9 @@ public class UserCouponRepositoryImpl implements UserCouponRepository {
     public List<UserCoupon> findUnusedByUserId(Long userId) {
         return userCouponJpaRepository.findByUserIdAndIsUsedFalse(userId);
     }
+
+    @Override
+    public boolean existsByUserIdAndCouponId(Long userId, Long couponId) {
+        return userCouponJpaRepository.existsByUserIdAndCouponId(userId, couponId);
+    }
 }

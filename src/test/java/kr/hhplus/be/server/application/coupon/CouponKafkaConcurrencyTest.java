@@ -20,16 +20,14 @@ import java.util.concurrent.atomic.AtomicInteger;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static kr.hhplus.be.server.common.exception.ErrorCode.COUPON_ISSUANCE_FAILED;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 @SpringBootTest
 @ActiveProfiles("test")
-class CouponConcurrencyTest {
+class CouponKafkaConcurrencyTest {
 
     @Autowired
     private CouponService couponService;
-
-    @Autowired
-    private CouponRedisService couponRedisService;
 
     @Autowired
     private CouponRepository couponRepository;
@@ -44,14 +42,6 @@ class CouponConcurrencyTest {
     @BeforeEach
     @Transactional
     void setUp() {
-        // 기존 데이터 정리
-        if (coupon != null) {
-            couponRedisService.deleteCouponData(coupon.getId());
-        }
-        
-        // 기존 UserCoupon 데이터 정리 (테스트 격리를 위해)
-        // 실제로는 테스트 환경에서만 사용해야 함
-        
         coupon = Coupon.builder()
                 .discountValue(1000L)
                 .discountType(DiscountType.AMOUNT)
@@ -64,7 +54,7 @@ class CouponConcurrencyTest {
     }
 
     @Test
-    void 동시에_여러_사용자가_쿠폰을_발급받을_때_정확한_수량만_발급되어야_한다() throws InterruptedException {
+    void 동시에_여러_사용자가_쿠폰을_발급_요청할_때_기본_검증이_정상적으로_동작해야_한다() throws InterruptedException {
         // given
         ExecutorService executorService = Executors.newFixedThreadPool(THREAD_COUNT);
         CountDownLatch latch = new CountDownLatch(THREAD_COUNT);
@@ -90,18 +80,28 @@ class CouponConcurrencyTest {
         latch.await();
 
         // then
-        assertThat(successCount.get()).isEqualTo(STOCK);
-        assertThat(failCount.get()).isEqualTo(THREAD_COUNT - STOCK);
-        
-        // Redis 기반 발급 완료 수 확인
-        Long issuedCount = couponRedisService.getIssuedCount(coupon.getId());
-        assertThat(issuedCount).isEqualTo((long) STOCK);
-        
-        // RDB UserCoupon 생성 확인 (비동기 처리 전이므로 즉시 확인)
-        assertThat(userCouponRepository.findAll().size()).isEqualTo(STOCK);
-        
-        // RDB 쿠폰 재고는 비동기로 차감되므로 원본 값 유지 확인
-        Coupon updatedCoupon = couponRepository.findById(coupon.getId()).orElseThrow();
-        assertThat(updatedCoupon.getStock()).isEqualTo((long) STOCK);
+        // Kafka 기반 시스템에서는 기본 검증만 수행하고 즉시 응답하므로
+        // 모든 요청이 성공적으로 처리되어야 함 (실제 발급은 비동기로 처리)
+        assertThat(successCount.get()).isEqualTo(THREAD_COUNT);
+        assertThat(failCount.get()).isEqualTo(0);
     }
-}
+
+    @Test
+    void 재고_부족_시_예외가_발생해야_한다() {
+        // given
+        Coupon outOfStockCoupon = Coupon.builder()
+                .discountValue(1000L)
+                .discountType(DiscountType.AMOUNT)
+                .title("재고 없는 쿠폰")
+                .stock(0L) // 재고 없음
+                .startDate(LocalDateTime.now())
+                .endDate(LocalDateTime.now().plusDays(30))
+                .build();
+        couponRepository.save(outOfStockCoupon);
+
+        // when & then
+        assertThatThrownBy(() -> couponService.issueCoupon(1L, outOfStockCoupon.getId()))
+                .isInstanceOf(ApiException.class)
+                .hasMessage("쿠폰 발급에 실패했습니다.");
+    }
+} 

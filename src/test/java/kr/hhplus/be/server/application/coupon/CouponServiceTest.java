@@ -19,6 +19,7 @@ import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
 import java.util.Optional;
+import java.util.concurrent.CompletableFuture;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -36,10 +37,7 @@ class CouponServiceTest {
     private CouponRepository couponRepository;
 
     @Mock
-    private CouponRedisService couponRedisService;
-
-    @Mock
-    private CouponEventService couponEventService;
+    private CouponKafkaEventService couponKafkaEventService;
 
     @InjectMocks
     private CouponService couponService;
@@ -129,35 +127,35 @@ class CouponServiceTest {
     }
 
     @Test
-    void 쿠폰이_정상적으로_발급된다() {
+    void 쿠폰이_정상적으로_발급_요청된다() {
         // given
         given(couponRepository.findById(couponId)).willReturn(Optional.of(coupon));
-        given(couponRedisService.getCouponLimit(couponId)).willReturn(0L);
-        given(couponRedisService.tryIssueCoupon(couponId, userId)).willReturn(true);
-        given(userCouponRepository.save(any(UserCoupon.class))).willReturn(userCoupon);
+        given(userCouponRepository.existsByUserIdAndCouponId(userId, couponId)).willReturn(false);
+        given(couponKafkaEventService.publishCouponIssueRequest(anyLong(), anyLong())).willReturn(CompletableFuture.completedFuture(null));
 
         // when
-        UserCoupon issuedCoupon = couponService.issueCoupon(userId, couponId);
+        couponService.issueCoupon(userId, couponId);
 
         // then
-        assertThat(issuedCoupon).isNotNull();
-        assertThat(issuedCoupon.getUserId()).isEqualTo(userId);
-        assertThat(issuedCoupon.getCouponId()).isEqualTo(couponId);
-        assertThat(issuedCoupon.isUsed()).isFalse();
-        
         then(couponRepository).should(times(1)).findById(couponId);
-        then(couponRedisService).should(times(1)).setCouponLimit(couponId, coupon.getStock());
-        then(couponRedisService).should(times(1)).tryIssueCoupon(couponId, userId);
-        then(userCouponRepository).should(times(1)).save(any(UserCoupon.class));
-        then(couponEventService).should(times(1)).publishCouponIssuedEvent(couponId, userId, userCoupon.getId());
+        then(userCouponRepository).should(times(1)).existsByUserIdAndCouponId(userId, couponId);
+        then(couponKafkaEventService).should(times(1)).publishCouponIssueRequest(userId, couponId);
     }
 
     @Test
-    void 쿠폰_발급_실패_시_예외가_발생한다() {
+    void 쿠폰_재고_부족_시_예외가_발생한다() {
         // given
-        given(couponRepository.findById(couponId)).willReturn(Optional.of(coupon));
-        given(couponRedisService.getCouponLimit(couponId)).willReturn(0L);
-        given(couponRedisService.tryIssueCoupon(couponId, userId)).willReturn(false);
+        Coupon outOfStockCoupon = Coupon.builder()
+            .id(couponId)
+            .discountValue(10000L)
+            .discountType(DiscountType.AMOUNT)
+            .title("신규 가입 쿠폰")
+            .stock(0L) // 재고 없음
+            .startDate(LocalDateTime.now().minusDays(1))
+            .endDate(LocalDateTime.now().plusDays(30))
+            .build();
+        
+        given(couponRepository.findById(couponId)).willReturn(Optional.of(outOfStockCoupon));
 
         // when & then
         assertThatThrownBy(() -> couponService.issueCoupon(userId, couponId))
@@ -165,9 +163,24 @@ class CouponServiceTest {
                 .hasMessage(COUPON_ISSUANCE_FAILED.getMessage());
 
         then(couponRepository).should(times(1)).findById(couponId);
-        then(couponRedisService).should(times(1)).setCouponLimit(couponId, coupon.getStock());
-        then(couponRedisService).should(times(1)).tryIssueCoupon(couponId, userId);
-        then(userCouponRepository).should(never()).save(any(UserCoupon.class));
+        then(userCouponRepository).should(never()).existsByUserIdAndCouponId(any(), any());
+        then(couponKafkaEventService).should(never()).publishCouponIssueRequest(any(), any());
+    }
+
+    @Test
+    void 중복_쿠폰_발급_시도_시_예외가_발생한다() {
+        // given
+        given(couponRepository.findById(couponId)).willReturn(Optional.of(coupon));
+        given(userCouponRepository.existsByUserIdAndCouponId(userId, couponId)).willReturn(true);
+
+        // when & then
+        assertThatThrownBy(() -> couponService.issueCoupon(userId, couponId))
+                .isInstanceOf(ApiException.class)
+                .hasMessage(COUPON_ALREADY_ISSUED.getMessage());
+
+        then(couponRepository).should(times(1)).findById(couponId);
+        then(userCouponRepository).should(times(1)).existsByUserIdAndCouponId(userId, couponId);
+        then(couponKafkaEventService).should(never()).publishCouponIssueRequest(any(), any());
     }
 
     @Test
@@ -181,8 +194,8 @@ class CouponServiceTest {
                 .hasMessage(COUPON_NOT_FOUND.getMessage());
 
         then(couponRepository).should(times(1)).findById(couponId);
-        then(couponRedisService).should(never()).tryIssueCoupon(any(), any());
-        then(userCouponRepository).should(never()).save(any(UserCoupon.class));
+        then(userCouponRepository).should(never()).existsByUserIdAndCouponId(any(), any());
+        then(couponKafkaEventService).should(never()).publishCouponIssueRequest(any(), any());
     }
 
     @Test
@@ -227,33 +240,5 @@ class CouponServiceTest {
 
         // then
         assertThat(discountedPrice).isEqualTo(40000L); // 50000 - 10000
-    }
-
-    @Test
-    void 쿠폰_발급_순위_조회에_성공한다() {
-        // given
-        Long expectedRank = 5L;
-        given(couponRedisService.getIssueRank(couponId, userId)).willReturn(expectedRank);
-
-        // when
-        Long actualRank = couponService.getIssueRank(couponId, userId);
-
-        // then
-        assertThat(actualRank).isEqualTo(expectedRank);
-        then(couponRedisService).should(times(1)).getIssueRank(couponId, userId);
-    }
-
-    @Test
-    void 쿠폰_발급_완료_수_조회_성공한다() {
-        // given
-        Long expectedCount = 50L;
-        given(couponRedisService.getIssuedCount(couponId)).willReturn(expectedCount);
-
-        // when
-        Long actualCount = couponService.getIssuedCount(couponId);
-
-        // then
-        assertThat(actualCount).isEqualTo(expectedCount);
-        then(couponRedisService).should(times(1)).getIssuedCount(couponId);
     }
 } 

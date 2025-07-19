@@ -19,6 +19,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
+import java.util.Map;
 
 import static kr.hhplus.be.server.common.exception.ErrorCode.*;
 
@@ -57,17 +58,24 @@ public class OrderService {
 
             validateOrderProducts(orderProducts);
             decreaseProductStocksWithLock(orderProducts);
-            long totalPrice = calculateTotalPrice(orderProducts);
+            
+            Map<Long, Product> productMap = getProductMap(orderProducts);
+
+            long totalPrice = calculateTotalPrice(orderProducts, productMap);
             totalPrice = calculateDiscountedPrice(order, totalPrice);
             processCouponUsage(order);
 
             Order savedOrder = saveOrder(order, totalPrice);
             initiatePayment(savedOrder, totalPrice);
-            saveOrderProducts(savedOrder, orderProducts);
+            saveOrderProducts(savedOrder, orderProducts, productMap);
 
             updateBestSellerRanking(orderProducts);
 
-            orderEventPublisher.publishOrderCompletedEvent(savedOrder, orderProducts);
+            List<Product> products = orderProducts.stream()
+                    .map(orderProduct -> productMap.get(orderProduct.getProductId()))
+                    .toList();
+            
+            orderEventPublisher.publishOrderCompletedEvent(savedOrder, orderProducts, products);
 
             log.info("주문 생성 완료 - 주문 ID: {}, 사용자 ID: {}", savedOrder.getId(), order.getUserId());
             return savedOrder;
@@ -98,10 +106,19 @@ public class OrderService {
                 });
     }
 
-    private long calculateTotalPrice(List<OrderProduct> orderProducts) {
+    private Map<Long, Product> getProductMap(List<OrderProduct> orderProducts) {
+        List<Long> productIds = orderProducts.stream()
+                .map(OrderProduct::getProductId)
+                .distinct()
+                .toList();
+        Map<Long, Product> productMap = productService.getProductMapByIds(productIds);
+        return productMap;
+    }
+
+    private long calculateTotalPrice(List<OrderProduct> orderProducts, Map<Long, Product> productMap) {
         return orderProducts.stream()
                 .mapToLong(it -> {
-                    Product product = productService.getProduct(it.getProductId());
+                    Product product = productMap.get(it.getProductId());
                     return product.getPrice() * it.getQuantity();
                 })
                 .sum();
@@ -152,9 +169,9 @@ public class OrderService {
         }
     }
 
-    private void saveOrderProducts(Order order, List<OrderProduct> orderProducts) {
+    private void saveOrderProducts(Order order, List<OrderProduct> orderProducts, Map<Long, Product> productMap) {
         for (OrderProduct orderProduct : orderProducts) {
-            Product product = productService.getProduct(orderProduct.getProductId());
+            Product product = productMap.get(orderProduct.getProductId());
             orderProduct.assignOrderInfo(order.getId(), product.getPrice());
             orderProductRepository.save(orderProduct);
         }

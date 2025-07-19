@@ -46,6 +46,28 @@ public class ProductService {
     }
 
     /**
+     * 상품 ID 목록으로 일괄 조회
+     */
+    public List<Product> getProductsByIds(List<Long> productIds) {
+        if (productIds == null || productIds.isEmpty()) {
+            return List.of();
+        }
+        return productRepository.findByIds(productIds);
+    }
+
+    /**
+     * 상품 ID로 상품 맵 생성
+     */
+    public Map<Long, Product> getProductMapByIds(List<Long> productIds) {
+        List<Product> products = getProductsByIds(productIds);
+        return products.stream()
+                .collect(java.util.stream.Collectors.toMap(
+                        Product::getId,
+                        product -> product
+                ));
+    }
+
+    /**
      * 상품들의 일일 판매량을 누적 업데이트
      */
     @Transactional

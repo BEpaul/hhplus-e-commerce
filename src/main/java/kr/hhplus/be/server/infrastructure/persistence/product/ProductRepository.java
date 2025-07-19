@@ -10,6 +10,7 @@ import org.springframework.stereotype.Repository;
 import org.springframework.transaction.annotation.Transactional;
 
 import jakarta.persistence.LockModeType;
+import java.util.List;
 import java.util.Optional;
 
 @Repository
@@ -21,6 +22,12 @@ public interface ProductRepository extends JpaRepository<Product, Long> {
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query("SELECT p FROM Product p WHERE p.id = :productId")
     Optional<Product> findByIdWithPessimisticLock(@Param("productId") Long productId);
+    
+    /**
+     * 상품 ID 목록으로 일괄 조회
+     */
+    @Query("SELECT p FROM Product p WHERE p.id IN :productIds")
+    List<Product> findByIds(@Param("productIds") List<Long> productIds);
     
     /**
      * 상품 판매량 업데이트

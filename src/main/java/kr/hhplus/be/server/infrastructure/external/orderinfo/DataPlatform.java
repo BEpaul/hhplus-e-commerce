@@ -1,6 +1,6 @@
 package kr.hhplus.be.server.infrastructure.external.orderinfo;
 
-import kr.hhplus.be.server.interfaces.web.order.dto.event.OrderCompletedEventDto;
+import kr.hhplus.be.server.domain.order.event.dto.OrderCompletedEventDto;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 
