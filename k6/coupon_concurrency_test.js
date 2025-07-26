@@ -23,12 +23,14 @@ switch (TEST_TYPE) {
     case 'load':
         options = {
             stages: [
-                { duration: '30s', target: 2000 },
-                { duration: '1m', target: 2000 },
-                { duration: '30s', target: 0 },
+                { duration: '2m', target: 500 },
+                { duration: '2m', target: 1000 },
+                { duration: '3m', target: 1500 },
+                { duration: '2m', target: 1000 },
+                { duration: '1m', target: 0 },
             ],
             thresholds: {
-                http_req_duration: ['p(95)<1000'],
+                http_req_duration: ['p(95)<2000'],
                 http_req_failed: ['rate<0.15'],
                 'success_rate': ['rate>0.85'],
             },

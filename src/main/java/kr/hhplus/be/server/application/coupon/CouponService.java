@@ -1,5 +1,6 @@
 package kr.hhplus.be.server.application.coupon;
 
+import kr.hhplus.be.server.infrastructure.kafka.coupon.CouponKafkaEventService;
 import kr.hhplus.be.server.common.exception.*;
 import kr.hhplus.be.server.domain.coupon.Coupon;
 import kr.hhplus.be.server.domain.coupon.CouponRepository;

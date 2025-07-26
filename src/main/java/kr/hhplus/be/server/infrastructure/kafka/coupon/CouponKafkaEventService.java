@@ -1,4 +1,4 @@
-package kr.hhplus.be.server.application.coupon;
+package kr.hhplus.be.server.infrastructure.kafka.coupon;
 
 import kr.hhplus.be.server.infrastructure.config.kafka.KafkaTopicConstants;
 import kr.hhplus.be.server.interfaces.web.coupon.dto.event.CouponIssueRequestEventDto;
@@ -46,22 +46,22 @@ public class CouponKafkaEventService {
     /**
      * 쿠폰 발급 결과 이벤트를 Kafka로 발행
      */
-    public CompletableFuture<SendResult<String, CouponIssueResultEventDto>> publishCouponIssueResult(
+    public void publishCouponIssueResult(
             CouponIssueResultEventDto resultEvent) {
         
         String key = resultEvent.getCouponId().toString();
         
         log.info("쿠폰 발급 결과 이벤트 발행 - 요청 ID: {}, 성공: {}", 
             resultEvent.getRequestId(), resultEvent.isSuccess());
-        
-        return couponIssueResultKafkaTemplate.send(KafkaTopicConstants.COUPON_ISSUE_RESULT, key, resultEvent)
+
+        couponIssueResultKafkaTemplate.send(KafkaTopicConstants.COUPON_ISSUE_RESULT, key, resultEvent)
                 .whenComplete((result, throwable) -> {
                     if (throwable != null) {
-                        log.error("쿠폰 발급 결과 이벤트 발행 실패 - 요청 ID: {}", 
-                            resultEvent.getRequestId(), throwable);
+                        log.error("쿠폰 발급 결과 이벤트 발행 실패 - 요청 ID: {}",
+                                resultEvent.getRequestId(), throwable);
                     } else {
-                        log.info("쿠폰 발급 결과 이벤트 발행 성공 - 요청 ID: {}, 파티션: {}, 오프셋: {}", 
-                            resultEvent.getRequestId(), result.getRecordMetadata().partition(), result.getRecordMetadata().offset());
+                        log.info("쿠폰 발급 결과 이벤트 발행 성공 - 요청 ID: {}, 파티션: {}, 오프셋: {}",
+                                resultEvent.getRequestId(), result.getRecordMetadata().partition(), result.getRecordMetadata().offset());
                     }
                 });
     }
